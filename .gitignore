@@ -1,0 +1,7 @@
+# Python (scripts de movil/scripts)
+.venv/
+__pycache__/
+
+# APK compilados (se descargan de EAS)
+*.apk
+*.aab
