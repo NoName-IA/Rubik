@@ -89,3 +89,18 @@ Desde `movil/`:
 | `npm run lint` | Lint |
 
 Estilo visual, estructura de carpetas y más comandos en [`movil/README.md`](movil/README.md).
+
+## Licencia
+
+Copyright (C) 2026 Brandon Alvis
+
+Este proyecto es software libre bajo la [GNU General Public License v3.0](LICENSE) (GPL-3.0-or-later).
+
+En resumen:
+
+- Puedes usar, copiar, estudiar y modificar el código, incluso con fines comerciales.
+- Si distribuyes este proyecto o una versión modificada (por ejemplo, publicando el código o una app compilada), debes hacerlo **bajo esta misma licencia** y **con el código fuente disponible**. Es decir, los derivados también tienen que ser open source.
+- Debes conservar el aviso de copyright y la licencia, e indicar los cambios que hiciste.
+- El software se entrega "tal cual", sin garantía.
+
+Este resumen es solo orientativo; el texto legal válido es el del archivo [`LICENSE`](LICENSE).

@@ -40,5 +40,6 @@
     "test": "node --test \"tests/**/*.test.ts\"",
     "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "license": "GPL-3.0-or-later"
 }
