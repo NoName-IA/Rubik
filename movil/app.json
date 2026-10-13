@@ -2,7 +2,7 @@
   "expo": {
     "name": "Rubik",
     "slug": "barranquilla-hoy",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,7 +15,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.rubik.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
