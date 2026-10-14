@@ -96,7 +96,7 @@ test("fecha de hoy en Colombia", () => {
 
 import { trmConRespaldo } from "../src/lib/dolar.ts";
 
-test("sin conexión usa la última TRM guardada (hasta 7 días)", async () => {
+test("sin conexión usa la última TRM guardada (hasta 30 días)", async () => {
   const datos = new Map<string, string>();
   const almacen = { getItem: async (k: string) => datos.get(k) ?? null, setItem: async (k: string, v: string) => void datos.set(k, v) };
   const sinRed = async (): Promise<Trm> => {
@@ -107,7 +107,7 @@ test("sin conexión usa la última TRM guardada (hasta 7 días)", async () => {
   const g = await trmConRespaldo(sinRed, almacen, () => 1000 + 3 * 24 * 3600_000);
   assert.equal(g.guardado, true);
   assert.equal(g.serie[0].valor, 3194.44);
-  await assert.rejects(trmConRespaldo(sinRed, almacen, () => 1000 + 8 * 24 * 3600_000), /conexión/);
+  await assert.rejects(trmConRespaldo(sinRed, almacen, () => 1000 + 31 * 24 * 3600_000), /conexión/);
 });
 
 test("al tocar la gráfica se elige el punto más cercano al dedo", () => {

@@ -167,3 +167,12 @@ test("redondeo de coordenadas para la caché", () => {
   assert.deepEqual(redondear({ latitud: 10.96391, longitud: -74.79641 }), { latitud: 10.96, longitud: -74.8 });
   assert.deepEqual(redondear(BARRANQUILLA), { latitud: 10.96, longitud: -74.8 });
 });
+
+test("deCuando: hoy, ayer u otra fecha", async () => {
+  const { deCuando } = await import("../src/lib/clima/formato.ts");
+  const bogota = -18000;
+  const guardado = Date.parse("2026-10-12T23:40:00Z"); // 6:40 p. m. del 12 en Bogotá
+  assert.equal(deCuando(guardado, bogota, Date.parse("2026-10-13T02:00:00Z")), "de las 6:40 p. m.");
+  assert.equal(deCuando(guardado, bogota, Date.parse("2026-10-13T15:00:00Z")), "de ayer, 6:40 p. m.");
+  assert.equal(deCuando(guardado, bogota, Date.parse("2026-10-15T15:00:00Z")), "del 12 oct");
+});

@@ -81,3 +81,24 @@ test("próximas horas de aire y URL", () => {
   assert.equal(url.searchParams.get("past_days"), "1");
   assert.equal(url.searchParams.get("timezone"), "auto");
 });
+
+test("respaldo: sin red usa la guardada del mismo sector y reciente; si no, error", async () => {
+  const { aireConRespaldo } = await import("../src/lib/aire/openMeteoAire.ts");
+  const datos = new Map<string, string>();
+  const almacen = { getItem: async (k: string) => datos.get(k) ?? null, setItem: async (k: string, v: string) => void datos.set(k, v) };
+  const barranquilla = { latitud: 10.96, longitud: -74.8 };
+  const cartagena = { latitud: 10.39, longitud: -75.48 };
+  const aire: Aire = { horas: [], desfaseUtc: -18000, obtenido: 1000 };
+  const sinRed = async (): Promise<Aire> => {
+    throw new Error("No hay conexión a internet");
+  };
+
+  const nueva = await aireConRespaldo(async () => aire, barranquilla, almacen);
+  assert.equal(nueva.guardado, undefined);
+  await new Promise((r) => setTimeout(r, 0));
+
+  const g = await aireConRespaldo(sinRed, barranquilla, almacen, () => 1000 + 3600_000);
+  assert.equal(g.guardado, true);
+  await assert.rejects(aireConRespaldo(sinRed, cartagena, almacen, () => 2000), /conexión/);
+  await assert.rejects(aireConRespaldo(sinRed, barranquilla, almacen, () => 1000 + 25 * 3600_000), /conexión/);
+});

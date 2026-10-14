@@ -203,5 +203,5 @@ test("cliente: si caen todas, usa lo guardado; sin guardado, error", async () =>
   assert.equal(r.guardado, true);
   assert.equal(r.noticias.length, 30);
   await assert.rejects(noticiasConRespaldo("atlantico", pedidos(todas), a, () => AHORA), /ninguna fuente/);
-  await assert.rejects(noticiasConRespaldo("barranquilla", pedidos(todas), a, () => AHORA + 49 * 3600_000), /ninguna fuente/);
+  await assert.rejects(noticiasConRespaldo("barranquilla", pedidos(todas), a, () => AHORA + 8 * 24 * 3600_000), /ninguna fuente/);
 });

@@ -74,7 +74,7 @@ export function ClimaHoy({ p }: { p: Pronostico }) {
           </Text>
         ) : null}
         <Text style={[styles.pieTexto, { color: c.apagado }]}>
-          Actualizado {haceCuanto(p.obtenido)} · Pronóstico de Open-Meteo
+          Actualizado {haceCuanto(p.obtenido)}
         </Text>
       </View>
     </>

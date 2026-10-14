@@ -8,8 +8,8 @@ export interface Almacen {
 }
 
 export const CLAVE_RESPALDO = "pronostico:ultimo";
-/** Un pronóstico guardado sirve hasta 24 h (después las horas ya pasaron). */
-export const EDAD_MAXIMA_MS = 24 * 3600_000;
+/** Un pronóstico guardado sirve hasta 6 días: se piden 7, así que aún le quedan horas por delante. */
+export const EDAD_MAXIMA_MS = 6 * 24 * 3600_000;
 /** Solo se usa si es del mismo sector (no mostrar el de otra ciudad). */
 export const DISTANCIA_MAXIMA_KM = 25;
 

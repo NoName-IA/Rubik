@@ -56,7 +56,7 @@ test("sin red y guardado muy viejo: propaga el error", async () => {
   const almacen = almacenEnMemoria();
   await conRespaldo(async () => pronostico(0), BARRANQUILLA, almacen);
   await esperarGuardado();
-  await assert.rejects(conRespaldo(sinRed, BARRANQUILLA, almacen, () => 25 * 3600_000), /conexión/);
+  await assert.rejects(conRespaldo(sinRed, BARRANQUILLA, almacen, () => 7 * 24 * 3600_000), /conexión/);
 });
 
 test("sin red y guardado de otra ciudad: propaga el error", async () => {

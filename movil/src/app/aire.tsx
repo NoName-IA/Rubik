@@ -36,8 +36,8 @@ export default function DetalleAire() {
               norma colombiana.
             </Text>
             <Text style={[styles.nota, { color: c.apagado }]}>
-              Datos modelados por CAMS (Copernicus) a través de Open-Meteo, no medidos por estaciones de la ciudad.
-              Actualizado {haceCuanto(data.obtenido)}.
+              Datos modelados, no medidos por estaciones de la ciudad.
+              {data.guardado ? " Sin conexión · " : " "}Actualizado {haceCuanto(data.obtenido)}.
             </Text>
           </Panel>
         </>

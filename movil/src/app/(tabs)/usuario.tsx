@@ -91,9 +91,7 @@ export default function Usuario() {
 
       <Panel titulo="Acerca de">
         <Text style={[styles.nota, { color: c.tinta2 }]}>
-          Pronóstico: Open-Meteo. Calidad del aire: CAMS (Copernicus) vía Open-Meteo. Dólar: TRM de la
-          Superintendencia Financiera (datos.gov.co). Noticias: El Heraldo y Zona Cero; cada nota se abre en el
-          sitio del medio.
+          Cada noticia se abre en el sitio del medio que la publicó.
         </Text>
         <Text style={[styles.nota, { color: c.apagado }]}>
           {Constants.expoConfig?.name ?? "Rubik"} · versión {Constants.expoConfig?.version ?? "—"}

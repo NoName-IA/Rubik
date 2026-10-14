@@ -5,7 +5,7 @@ import { StyleSheet, View } from "react-native";
 
 import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
-import { ahoraLocal, formatoHoraMinutos } from "@/lib/clima/formato";
+import { deCuando } from "@/lib/clima/formato";
 import { fraseArroyos, type Ventana } from "@/lib/clima/resumen";
 import type { Pronostico } from "@/lib/clima/tipos";
 import { espacio, radio, useColores } from "@/theme";
@@ -58,7 +58,7 @@ export function AvisoSinConexion({ p }: { p: Pronostico }) {
     <View style={[styles.sinConexion, { backgroundColor: c.superficie, borderColor: c.borde }]} accessibilityLiveRegion="polite">
       <Ionicons name="cloud-offline-outline" size={16} color={c.tinta2} />
       <Text style={{ color: c.tinta2, fontSize: 13 }}>
-        Sin conexión · datos de las {formatoHoraMinutos(ahoraLocal(p.desfaseUtc, p.obtenido))}
+        Sin conexión · datos {deCuando(p.obtenido, p.desfaseUtc)}
       </Text>
     </View>
   );

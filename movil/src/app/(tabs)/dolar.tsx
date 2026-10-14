@@ -31,7 +31,7 @@ export default function Dolar() {
   const { data, error, isPending, isRefetching, refetch } = useDolar();
 
   return (
-    <Pantalla titulo="Dólar" subtitulo="TRM oficial · Superintendencia Financiera" alRefrescar={() => refetch()} refrescando={isRefetching}>
+    <Pantalla titulo="Dólar" subtitulo="TRM oficial" alRefrescar={() => refetch()} refrescando={isRefetching}>
       {data ? (
         <Contenido t={data} />
       ) : error && !isPending ? (
@@ -44,8 +44,7 @@ export default function Dolar() {
         </Panel>
       )}
       <Text style={[styles.fuente, { color: c.apagado }]}>
-        Fuente: datos.gov.co (Superintendencia Financiera). La TRM es el promedio oficial del mercado; las casas de
-        cambio y los bancos compran y venden a otros precios.
+        La TRM es el promedio oficial del mercado; las casas de cambio y los bancos compran y venden a otros precios.
       </Text>
     </Pantalla>
   );

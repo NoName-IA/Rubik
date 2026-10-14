@@ -10,8 +10,8 @@ import { Panel } from "@/components/Panel";
 import { Segmentos } from "@/components/Segmentos";
 import { useNoticias } from "@/hooks/useNoticias";
 import { useRecordado } from "@/hooks/useRecordado";
-import { ahoraLocal, formatoHoraMinutos } from "@/lib/clima/formato";
-import { NOMBRE_FUENTE, type Zona } from "@/lib/noticias/fuentes";
+import { deCuando } from "@/lib/clima/formato";
+import type { Zona } from "@/lib/noticias/fuentes";
 import { espacio, radio, useColores } from "@/theme";
 
 const ZONAS = [
@@ -31,9 +31,9 @@ export default function Noticias() {
       <Segmentos opciones={ZONAS} valor={zona} alCambiar={setZona} />
 
       {data?.guardado ? (
-        <Aviso texto={`Sin conexión · noticias de las ${horaDelCelular(data.obtenido)}`} />
+        <Aviso texto={`Sin conexión · noticias ${deCuando(data.obtenido, -new Date(data.obtenido).getTimezoneOffset() * 60)}`} />
       ) : data && data.caidas.length > 0 ? (
-        <Aviso texto={`No respondió: ${data.caidas.map((f) => NOMBRE_FUENTE[f]).join(", ")}. Se muestran las demás fuentes.`} />
+        <Aviso texto={"Algunas noticias no se pudieron cargar. Se muestran las demás."} />
       ) : null}
 
       {data ? (
@@ -57,15 +57,10 @@ export default function Noticias() {
       )}
 
       <Text style={[styles.pie, { color: c.apagado }]}>
-        Fuentes: El Heraldo y Zona Cero. Al tocar una noticia se abre en el sitio del medio.
+        Al tocar una noticia se abre en el sitio del medio.
       </Text>
     </Pantalla>
   );
-}
-
-/** "6:40 p. m." en la zona horaria del celular. */
-function horaDelCelular(ms: number): string {
-  return formatoHoraMinutos(ahoraLocal(-new Date(ms).getTimezoneOffset() * 60, ms));
 }
 
 function Aviso({ texto }: { texto: string }) {

@@ -158,8 +158,8 @@ export function vigencia(d: DiaTrm): string {
 
 
 const CLAVE_RESPALDO = "trm:ultima";
-/** La TRM cambia una vez por día hábil: lo guardado sirve hasta 7 días. */
-const EDAD_MAXIMA_MS = 7 * 24 * 3600_000;
+/** La TRM cambia una vez por día hábil; lo guardado se muestra con su fecha hasta 30 días. */
+const EDAD_MAXIMA_MS = 30 * 24 * 3600_000;
 
 export async function trmConRespaldo(obtener: () => Promise<Trm>, almacen: Almacen, ahora: () => number = Date.now): Promise<Trm> {
   try {

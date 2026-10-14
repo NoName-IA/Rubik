@@ -54,9 +54,9 @@ export async function cargarNoticias(
 }
 
 const clave = (zona: Zona) => `noticias:${zona}`;
-const EDAD_MAXIMA_MS = 48 * 3600_000;
+const EDAD_MAXIMA_MS = 7 * 24 * 3600_000;
 
-/** Si todo falla, devuelve la última lista guardada (hasta 48 h); si no hay, propaga el error. */
+/** Si todo falla, devuelve la última lista guardada (hasta 7 días); si no hay, propaga el error. */
 export async function noticiasConRespaldo(
   zona: Zona,
   p: Pedidos,

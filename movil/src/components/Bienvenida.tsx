@@ -103,7 +103,7 @@ export function Bienvenida() {
         </Text>
         <Text style={[styles.nota, { color: c.apagado }]}>
           Solo se usa con la app abierta y no sale de tu celular, salvo las coordenadas que se envían al servicio
-          del pronóstico (Open-Meteo). Puedes cambiarlo después en Usuario.
+          del pronóstico. Puedes cambiarlo después en Usuario.
         </Text>
       </View>
       <View style={styles.botones}>

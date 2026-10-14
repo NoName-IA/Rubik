@@ -50,5 +50,17 @@ export function haceCuanto(desde: number, ahora: number = Date.now()): string {
   const min = Math.max(0, Math.round((ahora - desde) / 60_000));
   if (min < 1) return "justo ahora";
   if (min < 60) return `hace ${min} min`;
-  return `hace ${Math.round(min / 60)} h`;
+  if (min < 48 * 60) return `hace ${Math.round(min / 60)} h`;
+  return `hace ${Math.round(min / 1440)} días`;
+}
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** Cuándo se guardaron unos datos: "de las 6:40 p. m.", "de ayer, 6:40 p. m." o "del 12 oct". */
+export function deCuando(guardado: number, desfaseUtc: number, ahora: number = Date.now()): string {
+  const g = ahoraLocal(desfaseUtc, guardado);
+  const dias = Math.round((Date.parse(ahoraLocal(desfaseUtc, ahora).slice(0, 10)) - Date.parse(g.slice(0, 10))) / 86_400_000);
+  if (dias <= 0) return `de las ${formatoHoraMinutos(g)}`;
+  if (dias === 1) return `de ayer, ${formatoHoraMinutos(g)}`;
+  return `del ${Number(g.slice(8, 10))} ${MESES[Number(g.slice(5, 7)) - 1]}`;
 }
