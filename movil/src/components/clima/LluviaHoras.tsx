@@ -4,8 +4,9 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { Panel } from "@/components/Panel";
 import { diaCorto } from "@/lib/fecha";
@@ -88,7 +89,7 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
                   const alto = prob === 0 ? 0 : Math.max(3, (prob / 100) * ALTO);
                   const medianoche = i > 0 && h.hora.endsWith("T00:00");
                   return (
-                    <Pressable
+                    <Presionable
                       key={h.hora}
                       onPress={() => setElegida(i)}
                       accessibilityRole="button"
@@ -112,7 +113,7 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
                           ]}
                         />
                       </View>
-                    </Pressable>
+                    </Presionable>
                   );
                 })}
               </View>
@@ -152,9 +153,9 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
       </Panel>
 
       <Panel>
-        <Pressable onPress={() => setVerTabla((v) => !v)} accessibilityRole="button" style={styles.botonTabla}>
+        <Presionable onPress={() => setVerTabla((v) => !v)} accessibilityRole="button" style={styles.botonTabla}>
           <Text style={{ color: c.enfasis, fontWeight: "600" }}>{verTabla ? "Ocultar tabla" : "Ver como tabla"}</Text>
-        </Pressable>
+        </Presionable>
         {verTabla ? (
           <View>
             <View style={[styles.fila, { borderBottomColor: c.borde }]}>

@@ -27,7 +27,7 @@ export default function Noticias() {
   const ahora = data?.obtenido ?? 0;
 
   return (
-    <Pantalla bordeSuperior={false} alRefrescar={() => refetch()} refrescando={isRefetching}>
+    <Pantalla bordeSuperior={false} alRefrescar={() => refetch()} refrescando={isRefetching} botonArriba>
       <Segmentos opciones={ZONAS} valor={zona} alCambiar={setZona} />
 
       {data?.guardado ? (

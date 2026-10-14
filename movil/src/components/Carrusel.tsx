@@ -3,8 +3,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { FlatList, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { FlatList, type NativeScrollEvent, type NativeSyntheticEvent, StyleSheet, useWindowDimensions, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import type { Acceso } from "@/lib/accesos";
 import { indiceActivo, medirCarrusel } from "@/lib/carrusel";
@@ -43,7 +44,7 @@ export function Carrusel({ accesos, detalles = {} }: { accesos: Acceso[]; detall
         renderItem={({ item }) => {
           const disponible = item.ruta !== undefined;
           return (
-            <Pressable
+            <Presionable
               onPress={() => item.ruta && router.push(item.ruta)}
               disabled={!disponible}
               accessibilityRole="button"
@@ -67,7 +68,7 @@ export function Carrusel({ accesos, detalles = {} }: { accesos: Acceso[]; detall
               <Text style={[styles.detalle, { color: c.tinta2 }]} numberOfLines={2}>
                 {detalles[item.clave] ?? item.detalle}
               </Text>
-            </Pressable>
+            </Presionable>
           );
         }}
       />

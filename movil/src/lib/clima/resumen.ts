@@ -1,8 +1,9 @@
 // Frase de resumen de la lluvia y alerta de arroyos (sin React, probado con node:test).
 
+import type { Observacion } from "./metar.ts";
 import type { Hora, HoraLocal } from "./tipos.ts";
 
-/** Horas seguidas con probabilidad ≥ umbral. `hasta` es la hora siguiente a la última. */
+/** Horas seguidas que cumplen una condición (lluvia, arroyos). `hasta` es la hora siguiente a la última. */
 export interface Ventana {
   desde: HoraLocal;
   hasta: HoraLocal;
@@ -39,10 +40,29 @@ export function agrupar(horas: Hora[], cumple: (h: Hora) => boolean): Ventana[] 
   return ventanas;
 }
 
+/**
+ * Una hora cuenta como lluvia con probabilidad ≥ 50 % y ≥ 0,2 mm.
+ *
+ * Contrastado con 10 estaciones automáticas del IDEAM en el Atlántico (13 sept.–12 oct. 2026,
+ * 7.198 horas): sin exigir milímetros se anunciaba lluvia casi 3 veces más de lo que llovía; con
+ * 0,2 mm el exceso baja a 1,3 veces. Probar otros modelos (ICON, ECMWF, GFS…), su promedio o
+ * umbrales más altos no mejoró de forma clara. Aun así, en un punto concreto la mayoría de los
+ * anuncios no se cumplen (los aguaceros son muy locales): por eso las frases dicen "posible".
+ */
 export const UMBRAL_LLUVIA = 50;
+/** Con menos milímetros son gotas sueltas que casi no se notan, aunque la probabilidad sea alta. */
+export const MM_LLUVIA = 0.2;
+
+/** Hora con lluvia que se nota: probabilidad alta y milímetros reales. */
+export function hayLluvia(h: Hora, umbral = UMBRAL_LLUVIA): boolean {
+  return (h.probabilidad ?? 0) >= umbral && h.mm >= MM_LLUVIA;
+}
+
+/** Códigos WMO de llovizna (51–57): agua fina, no aguacero. */
+const esLlovizna = (h: Hora) => h.codigo >= 51 && h.codigo <= 57;
 
 export function ventanasLluvia(horas: Hora[], umbral = UMBRAL_LLUVIA): Ventana[] {
-  return agrupar(horas, (h) => (h.probabilidad ?? 0) >= umbral);
+  return agrupar(horas, (h) => hayLluvia(h, umbral));
 }
 
 // --- Textos ------------------------------------------------------------------------
@@ -84,51 +104,89 @@ export function cuando(hora: HoraLocal, hoy: string): string {
   return dias === 1 ? "mañana" : "pasado mañana";
 }
 
+/** Lo más fuerte que trae un grupo de ventanas: tormenta eléctrica > lluvia > lloviznas. */
+type TipoLluvia = "tormenta" | "lluvia" | "llovizna";
+
+function tipoLluvia(ventanas: Ventana[]): TipoLluvia {
+  const horas = ventanas.flatMap((v) => v.horas);
+  if (horas.some((h) => h.codigo >= 95)) return "tormenta";
+  return horas.every(esLlovizna) ? "llovizna" : "lluvia";
+}
+
+const PODRIA: Record<TipoLluvia, string> = {
+  tormenta: "podría haber tormenta eléctrica",
+  lluvia: "podría llover",
+  llovizna: "podría haber lloviznas",
+};
+
+/** "a las 3 p. m.", "entre 2 y 5 p. m.", "desde ya hasta las 7 p. m.", unidas con "y". */
+function cuandoLlueve(ventanas: Ventana[], ahora: HoraLocal | null): string {
+  const partes = ventanas.map((v) => {
+    if (v.desde === ahora) return v.horas.length === 1 ? "en la próxima hora" : `desde ya hasta ${hastaLas(v.hasta)}`;
+    return v.horas.length === 1 ? aLas(v.desde, true) : rangoHoras(v.desde, v.hasta);
+  });
+  return partes.length === 1 ? partes[0] : `${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}`;
+}
+
 /**
- * Una frase para las próximas horas, p. ej.:
- * "Lloverá entre 2 y 5 p. m.; lo más fuerte, a las 3."
- * `horas` empieza en la hora en curso.
+ * Resumen corto de la lluvia por días, p. ej. "Hoy podría llover entre 2 y 5 p. m. Mañana también
+ * podría haber tormenta eléctrica a las 3 p. m." o "Hoy no llueve. Mañana tampoco."
+ * `horas` empieza en la hora en curso; se usan las de hoy y las de mañana.
+ *
+ * El pronóstico no ve el cielo real. Si hay un aeropuerto cerca con reporte vigente (`obs`), su
+ * observación manda para la hora en curso (ver metar.ts), pero la frase no lo menciona.
  */
-export function fraseLluvia(horas: Hora[]): string {
+export function fraseLluvia(horas: Hora[], obs: Observacion | null = null): string {
   if (horas.length === 0) return "Sin datos de lluvia.";
   const hoy = horas[0].hora.slice(0, 10);
-  const ventanas = ventanasLluvia(horas);
+  let ahora: HoraLocal | null = horas[0].hora;
+  let deHoy = horas.filter((h) => h.hora.startsWith(hoy));
+  const deManana = horas.filter((h) => cuando(h.hora, hoy) === "mañana");
 
-  if (ventanas.length === 0) {
-    const max = horas.reduce((a, b) => ((b.probabilidad ?? 0) > (a.probabilidad ?? 0) ? b : a));
-    const p = max.probabilidad ?? 0;
-    if (p < 20) return "No se espera lluvia.";
-    const dia = cuando(max.hora, hoy);
-    return `Poca probabilidad de lluvia (máx. ${p} % ${dia ? `${dia} ` : ""}${aLas(max.hora, true)}).`;
+  // Lo anunciado para esta hora casi nunca se cumple si el aeropuerto está seco: se omite.
+  if (obs?.lluvia === "seco" && ventanasLluvia(deHoy)[0]?.desde === ahora) {
+    deHoy = deHoy.slice(1);
+    ahora = null;
   }
 
-  const [v, otra] = ventanas;
-  const dia = cuando(v.desde, hoy);
-  const empiezaYa = v.desde === horas[0].hora;
-  let frase: string;
-  if (empiezaYa && v.horas.length === 1) frase = "Puede llover ahora mismo";
-  else if (empiezaYa) frase = `Puede llover desde ya y hasta ${hastaLas(v.hasta)}`;
-  else if (v.horas.length === 1) frase = `${dia ? `${capital(dia)} p` : "P"}uede llover ${aLas(v.desde, true)}`;
-  else frase = `${dia ? `${capital(dia)} l` : "L"}loverá ${rangoHoras(v.desde, v.hasta)}`;
-
-  if (v.horas.length > 1 && v.pico.mm >= 0.5 && v.pico.hora !== v.desde) frase += `; lo más fuerte, ${aLas(v.pico.hora)}`;
-  frase = conPunto(frase);
-  if (otra) {
-    const diaOtra = cuando(otra.desde, hoy);
-    frase += conPunto(
-      ` Otra vez ${diaOtra && diaOtra !== dia ? `${diaOtra} ` : ""}${otra.horas.length === 1 ? aLas(otra.desde, true) : rangoHoras(otra.desde, otra.hasta)}`,
+  const frases: string[] = [];
+  const lluviaHoy = ventanasLluvia(deHoy);
+  if (obs?.lluvia === "llueve") {
+    const [primera, ...resto] = lluviaHoy;
+    const sigue = primera?.desde === ahora;
+    frases.push(
+      sigue
+        ? primera.horas.length === 1
+          ? "Está lloviendo; podría parar pronto."
+          : conPunto(`Está lloviendo y podría seguir hasta ${hastaLas(primera.hasta)}`)
+        : "Está lloviendo, pero no se espera que dure.",
     );
+    const despues = sigue ? resto : lluviaHoy;
+    if (despues.length > 0) frases.push(conPunto(`Podría volver a llover ${cuandoLlueve(despues, null)}`));
+  } else if (lluviaHoy.length > 0) {
+    frases.push(conPunto(`Hoy ${PODRIA[tipoLluvia(lluviaHoy)]} ${cuandoLlueve(lluviaHoy, ahora)}`));
+  } else {
+    // Probabilidad alta pero casi sin milímetros: no es lluvia, son gotas.
+    const gotas = deHoy.find((h) => (h.probabilidad ?? 0) >= UMBRAL_LLUVIA);
+    frases.push(gotas ? conPunto(`Hoy no llueve; quizás unas gotas ${gotas.hora === ahora ? "en la próxima hora" : aLas(gotas.hora, true)}`) : "Hoy no llueve.");
   }
-  return frase;
+  const lloveraHoy = obs?.lluvia === "llueve" || lluviaHoy.length > 0;
+
+  if (deManana.length > 0) {
+    const lluviaManana = ventanasLluvia(deManana);
+    if (lluviaManana.length > 0) {
+      frases.push(conPunto(`Mañana ${lloveraHoy ? "también " : ""}${PODRIA[tipoLluvia(lluviaManana)]} ${cuandoLlueve(lluviaManana, null)}`));
+    } else if (deManana.length === 24) {
+      // Solo se descarta la lluvia de mañana si se tiene el día completo.
+      frases.push(lloveraHoy ? "Mañana no se espera lluvia." : "Mañana tampoco.");
+    }
+  }
+  return frases.join(" ");
 }
 
 /** Cierra la oración sin duplicar el punto de "p. m." o "m.". */
 function conPunto(t: string): string {
   return t.endsWith(".") ? t : `${t}.`;
-}
-
-function capital(t: string): string {
-  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 // --- Arroyos -----------------------------------------------------------------------

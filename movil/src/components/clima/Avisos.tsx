@@ -1,8 +1,9 @@
 // Avisos sobre el pronóstico: riesgo de arroyos y datos guardados sin conexión.
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { ahoraLocal, formatoHoraMinutos } from "@/lib/clima/formato";
 import { fraseArroyos, type Ventana } from "@/lib/clima/resumen";
@@ -40,9 +41,9 @@ export function AlertaArroyos({
   );
   const estilo = [styles.caja, { backgroundColor: c.alertaSuave, borderColor: c.alerta }];
   return alTocar ? (
-    <Pressable onPress={alTocar} accessibilityRole="alert" style={({ pressed }) => [...estilo, { opacity: pressed ? 0.7 : 1 }]}>
+    <Presionable onPress={alTocar} accessibilityRole="alert" style={({ pressed }) => [...estilo, { opacity: pressed ? 0.7 : 1 }]}>
       {contenido}
-    </Pressable>
+    </Presionable>
   ) : (
     <View accessibilityRole="alert" style={estilo}>
       {contenido}

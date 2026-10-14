@@ -13,6 +13,7 @@ import {
   periodo,
   pesos,
   porcentaje,
+  puntoCercano,
   type Trm,
   URL_TRM,
   vigencia,
@@ -107,4 +108,18 @@ test("sin conexión usa la última TRM guardada (hasta 7 días)", async () => {
   assert.equal(g.guardado, true);
   assert.equal(g.serie[0].valor, 3194.44);
   await assert.rejects(trmConRespaldo(sinRed, almacen, () => 1000 + 8 * 24 * 3600_000), /conexión/);
+});
+
+test("al tocar la gráfica se elige el punto más cercano al dedo", () => {
+  // 5 puntos en 100 px con margen 10: quedan en x = 10, 30, 50, 70 y 90.
+  assert.equal(puntoCercano(10, 100, 5, 10), 0);
+  assert.equal(puntoCercano(39, 100, 5, 10), 1);
+  assert.equal(puntoCercano(41, 100, 5, 10), 2);
+  assert.equal(puntoCercano(90, 100, 5, 10), 4);
+  // Fuera de la gráfica se queda en los extremos.
+  assert.equal(puntoCercano(-30, 100, 5, 10), 0);
+  assert.equal(puntoCercano(500, 100, 5, 10), 4);
+  // Sin ancho todavía o con un solo punto no falla.
+  assert.equal(puntoCercano(20, 0, 5, 10), 0);
+  assert.equal(puntoCercano(20, 100, 1, 10), 0);
 });

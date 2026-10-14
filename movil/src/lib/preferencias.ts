@@ -14,8 +14,6 @@ export interface Preferencias {
   /** id de `CIUDADES` (se usa con `ubicacion: "ciudad"` y si no hay GPS). */
   ciudad: string;
   arroyos: SensibilidadArroyos;
-  /** Notificaciones antes de que llueva y antes del riesgo de arroyos. */
-  avisos: { lluvia: boolean; arroyos: boolean };
   tema: Tema;
 }
 
@@ -24,7 +22,6 @@ export const PREFERENCIAS_INICIALES: Preferencias = {
   ubicacion: "gps",
   ciudad: CIUDAD_INICIAL.id,
   arroyos: "normal",
-  avisos: { lluvia: true, arroyos: true },
   tema: "sistema",
 };
 
@@ -51,11 +48,6 @@ export function umbralArroyos(s: SensibilidadArroyos): { probabilidad: number; m
 const uno = <T extends string>(v: unknown, validos: readonly T[], porDefecto: T): T =>
   typeof v === "string" && (validos as readonly string[]).includes(v) ? (v as T) : porDefecto;
 
-const si = (v: unknown, clave: string, porDefecto: boolean): boolean => {
-  const x = v && typeof v === "object" ? (v as Record<string, unknown>)[clave] : undefined;
-  return typeof x === "boolean" ? x : porDefecto;
-};
-
 /**
  * Lee lo guardado sin confiar en su forma: campos que falten o sean inválidos (p. ej. de una
  * versión anterior de la app) toman el valor inicial.
@@ -76,10 +68,6 @@ export function leerPreferencias(texto: string | null): Preferencias {
     ubicacion: antigua ? "ciudad" : uno(g.ubicacion, ["gps", "ciudad"] as const, "gps"),
     ciudad: antigua ? "barranquilla" : ciudad,
     arroyos: uno(g.arroyos, ["mas", "normal", "menos"] as const, "normal"),
-    avisos: {
-      lluvia: si(g.avisos, "lluvia", PREFERENCIAS_INICIALES.avisos.lluvia),
-      arroyos: si(g.avisos, "arroyos", PREFERENCIAS_INICIALES.avisos.arroyos),
-    },
     tema: uno(g.tema, ["sistema", "claro", "oscuro"] as const, "sistema"),
   };
 }

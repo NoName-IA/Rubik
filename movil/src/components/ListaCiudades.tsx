@@ -1,8 +1,9 @@
 // Lista para elegir la ciudad (bienvenida y Usuario).
 
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { CIUDADES } from "@/lib/ciudades";
 import { espacio, useColores } from "@/theme";
@@ -14,7 +15,7 @@ export function ListaCiudades({ elegida, alElegir }: { elegida: string | null; a
       {CIUDADES.map((ciudad, i) => {
         const activa = ciudad.id === elegida;
         return (
-          <Pressable
+          <Presionable
             key={ciudad.id}
             onPress={() => alElegir(ciudad.id)}
             accessibilityRole="radio"
@@ -31,7 +32,7 @@ export function ListaCiudades({ elegida, alElegir }: { elegida: string | null; a
               <Text style={{ color: c.tinta2, fontSize: 12 }}>{ciudad.departamento}</Text>
             </View>
             {activa ? <Ionicons name="checkmark-circle" size={22} color={c.enfasis} /> : null}
-          </Pressable>
+          </Presionable>
         );
       })}
     </View>

@@ -2,12 +2,14 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import type { ComponentProps, ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import type { ComponentProps, ReactElement, ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { CategoriaIca } from "@/components/aire/CategoriaIca";
 import { AvisoSinConexion } from "@/components/clima/Avisos";
+import { IconoTiempo } from "@/components/clima/IconoTiempo";
 import { Carrusel } from "@/components/Carrusel";
 import { Encabezado } from "@/components/Encabezado";
 import { LineaUbicacion } from "@/components/LineaUbicacion";
@@ -18,12 +20,13 @@ import { usePreferencias } from "@/contexto/Preferencias";
 import { useAire } from "@/hooks/useAire";
 import { useDolar } from "@/hooks/useDolar";
 import { useNoticias } from "@/hooks/useNoticias";
-import { resumenDelDia, usePronostico } from "@/hooks/usePronostico";
+import { resumenDelDia, useObservacion, usePronostico } from "@/hooks/usePronostico";
 import { ACCESOS } from "@/lib/accesos";
 import { categoria } from "@/lib/aire/ica";
 import { promedio24h } from "@/lib/aire/openMeteoAire";
-import { iconoClima, textoClima } from "@/lib/clima/codigos";
+import { textoClima } from "@/lib/clima/codigos";
 import { grados } from "@/lib/clima/formato";
+import { codigoActual } from "@/lib/clima/metar";
 import { hoyColombia, pesos, porcentaje, vigente } from "@/lib/dolar";
 import { fechaLarga, saludo } from "@/lib/fecha";
 import { antiguedad } from "@/lib/noticias/combinar";
@@ -34,8 +37,10 @@ export default function Inicio() {
   const c = useColores();
   const router = useRouter();
   const { data: clima, error: errorClima } = usePronostico();
+  const obs = useObservacion();
   // En Inicio no va el aviso de arroyos (está en Clima): solo la frase de lluvia.
-  const resumen = clima ? resumenDelDia(clima, null) : null;
+  const resumen = clima ? resumenDelDia(clima, null, obs) : null;
+  const codigo = clima ? codigoActual(clima.actual.codigo, obs) : 0;
   const { nombre } = usePreferencias().preferencias;
   const { data: aire, error: errorAire } = useAire();
   const pm25 = aire ? promedio24h(aire, "pm25") : null;
@@ -61,11 +66,11 @@ export default function Inicio() {
 
       <Panel titulo="Resumen del día">
         <Linea
-          icono={clima ? iconoClima(clima.actual.codigo, clima.actual.esDia) : "partly-sunny-outline"}
+          icono={clima ? <IconoTiempo codigo={codigo} esDia={clima.actual.esDia} tamano={22} /> : "partly-sunny-outline"}
           alTocar={() => router.navigate("/clima")}
           texto={
             clima
-              ? `${grados(clima.actual.temperatura)} · ${textoClima(clima.actual.codigo)} · se siente como ${grados(clima.actual.sensacion)}`
+              ? `${grados(clima.actual.temperatura)} · ${textoClima(codigo)} · se siente como ${grados(clima.actual.sensacion)}`
               : errorClima
                 ? "Clima no disponible"
                 : "Cargando el clima…"
@@ -128,7 +133,8 @@ function Linea({
   alTocar,
   children,
 }: {
-  icono: ComponentProps<typeof Ionicons>["name"];
+  /** Nombre de Ionicons (en el color de énfasis) o un ícono propio, como el del tiempo. */
+  icono: ComponentProps<typeof Ionicons>["name"] | ReactElement;
   texto?: string;
   apagado?: boolean;
   alTocar: () => void;
@@ -136,13 +142,13 @@ function Linea({
 }) {
   const c = useColores();
   return (
-    <Pressable onPress={alTocar} accessibilityRole="link" style={({ pressed }) => [styles.linea, { opacity: pressed ? 0.6 : 1 }]}>
-      <Ionicons name={icono} size={20} color={c.enfasis} />
+    <Presionable onPress={alTocar} accessibilityRole="link" style={({ pressed }) => [styles.linea, { opacity: pressed ? 0.6 : 1 }]}>
+      {typeof icono === "string" ? <Ionicons name={icono} size={20} color={c.enfasis} /> : icono}
       <View style={styles.textoLinea}>
         {texto !== undefined ? <Text style={{ color: apagado ? c.tinta2 : c.tinta, fontSize: 15 }}>{texto}</Text> : children}
       </View>
       <Ionicons name="chevron-forward" size={18} color={c.apagado} />
-    </Pressable>
+    </Presionable>
   );
 }
 

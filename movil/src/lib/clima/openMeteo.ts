@@ -9,7 +9,7 @@ const ACTUAL = [
   "temperature_2m", "apparent_temperature", "relative_humidity_2m", "wind_speed_10m",
   "weather_code", "is_day", "uv_index",
 ];
-const HORARIO = ["temperature_2m", "precipitation_probability", "precipitation", "weather_code", "is_day"];
+const HORARIO = ["temperature_2m", "apparent_temperature", "precipitation_probability", "precipitation", "weather_code", "is_day"];
 const DIARIO = [
   "weather_code", "temperature_2m_max", "temperature_2m_min", "precipitation_probability_max",
   "precipitation_sum", "uv_index_max", "sunrise", "sunset",
@@ -46,6 +46,7 @@ export interface RespuestaOpenMeteo {
   hourly: {
     time: string[];
     temperature_2m: number[];
+    apparent_temperature?: (number | null)[];
     precipitation_probability: (number | null)[];
     precipitation: (number | null)[];
     weather_code: number[];
@@ -82,6 +83,7 @@ export function convertir(r: RespuestaOpenMeteo, obtenido: number): Pronostico {
     horas: h.time.map((hora, i) => ({
       hora,
       temperatura: h.temperature_2m[i],
+      sensacion: h.apparent_temperature?.[i] ?? undefined,
       probabilidad: h.precipitation_probability[i] ?? null,
       mm: h.precipitation[i] ?? 0,
       codigo: h.weather_code[i],

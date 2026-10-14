@@ -2,8 +2,9 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { CategoriaIca } from "@/components/aire/CategoriaIca";
 import { Esqueleto } from "@/components/Estados";
@@ -19,7 +20,7 @@ export function TarjetaAire() {
   const pm25 = data ? promedio24h(data, "pm25") : null;
 
   return (
-    <Pressable
+    <Presionable
       onPress={() => router.push("/aire")}
       accessibilityRole="button"
       accessibilityHint="Abre el detalle de la calidad del aire"
@@ -42,7 +43,7 @@ export function TarjetaAire() {
       ) : (
         <Esqueleto alto={40} />
       )}
-    </Pressable>
+    </Presionable>
   );
 }
 

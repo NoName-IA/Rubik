@@ -1,7 +1,8 @@
 // Barra de segmentos (p. ej. Hoy · Lluvia · 7 días).
 
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { espacio, radio, useColores } from "@/theme";
 
@@ -26,7 +27,7 @@ export function Segmentos<T extends string>({
       {opciones.map((o) => {
         const elegida = o.clave === valor;
         return (
-          <Pressable
+          <Presionable
             key={o.clave}
             onPress={() => alCambiar(o.clave)}
             role="tab"
@@ -36,7 +37,7 @@ export function Segmentos<T extends string>({
             <Text style={[styles.texto, { color: elegida ? c.tinta : c.tinta2 }]} numberOfLines={1}>
               {o.titulo}
             </Text>
-          </Pressable>
+          </Presionable>
         );
       })}
     </View>

@@ -1,21 +1,30 @@
-// Notificaciones locales de lluvia y arroyos: se reprograman cada vez que cambia el pronóstico o las
-// preferencias, y suenan a su hora aunque la app esté cerrada. Funcionan en Expo Go (las push no).
+// Notificaciones locales de lluvia, arroyos, mucho calor y aire limpio: se reprograman cada vez que cambia el pronóstico o las
+// preferencias, y suenan a su hora aunque la app esté cerrada. En Expo Go Android quedan apagados:
+// desde el SDK 53 importar expo-notifications ahí lanza un error (pide un development build).
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import type * as N from "expo-notifications";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Linking, Platform } from "react-native";
 
-import { usePreferencias } from "@/contexto/Preferencias";
+import { useAire } from "@/hooks/useAire";
 import { usePronostico } from "@/hooks/usePronostico";
 import { useUmbralArroyos } from "@/hooks/useUmbralArroyos";
-import { type Aviso, planearAvisos } from "@/lib/avisos";
+import { type Aviso, planearAvisos, RUTAS_AVISO, type RutaAviso } from "@/lib/avisos";
 
 const CANAL = "avisos";
 /** El permiso se pide solo una vez por sí solo; después, desde Usuario. */
 const CLAVE_PEDIDO = "avisos:permisoPedido";
-const disponible = Platform.OS !== "web";
+const enExpoGoAndroid = Platform.OS === "android" && Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const disponible = Platform.OS !== "web" && !enExpoGoAndroid;
+
+// Se carga solo donde funciona: un import normal se evalúa siempre y rompería Expo Go Android.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Notifications: typeof N = disponible ? require("expo-notifications") : (null as never);
+/** Sin el módulo no hay respuesta que leer; se elige una sola vez, así el hook es estable. */
+const useUltimaRespuesta = disponible ? Notifications.useLastNotificationResponse : () => null;
 
 if (disponible) {
   Notifications.setNotificationHandler({
@@ -26,7 +35,7 @@ if (disponible) {
 async function prepararCanal() {
   // En Android 13+ el diálogo de permiso no aparece si no existe al menos un canal.
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync(CANAL, { name: "Lluvia y arroyos", importance: Notifications.AndroidImportance.HIGH });
+    await Notifications.setNotificationChannelAsync(CANAL, { name: "Avisos del clima", importance: Notifications.AndroidImportance.HIGH });
   }
 }
 
@@ -53,11 +62,14 @@ async function programar(avisos: Aviso[]) {
   }
 }
 
-/** Programa los avisos y abre la pantalla de la notificación que se toque. Se monta una vez. */
+/**
+ * Programa los avisos (todos, siempre: no se configuran; solo dependen del permiso del celular) y abre
+ * la pantalla de la notificación que se toque. Se monta una vez.
+ */
 export function useAvisos() {
   const { data } = usePronostico();
   const umbral = useUmbralArroyos();
-  const { lluvia, arroyos } = usePreferencias().preferencias.avisos;
+  const { data: aire } = useAire();
 
   // `umbral` es un objeto nuevo en cada render: se compara por sus valores.
   const probabilidad = umbral?.probabilidad;
@@ -65,21 +77,22 @@ export function useAvisos() {
 
   useEffect(() => {
     if (!disponible || !data) return;
-    const u = arroyos && probabilidad !== undefined && mm !== undefined ? { probabilidad, mm } : null;
-    programar(planearAvisos(data, { lluvia, arroyos: u })).catch(() => {});
-  }, [data, lluvia, arroyos, probabilidad, mm]);
+    const arroyos = probabilidad !== undefined && mm !== undefined ? { probabilidad, mm } : null;
+    programar(planearAvisos(data, { lluvia: true, arroyos, calor: true, aire: aire ?? null })).catch(() => {});
+  }, [data, probabilidad, mm, aire]);
 
-  const respuesta = Notifications.useLastNotificationResponse();
+  const respuesta = useUltimaRespuesta();
   useEffect(() => {
     if (!respuesta || respuesta.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-    if (respuesta.notification.request.content.data?.ruta === "/clima") router.navigate("/clima");
+    const ruta = respuesta.notification.request.content.data?.ruta;
+    if (RUTAS_AVISO.includes(ruta as RutaAviso)) router.navigate(ruta as RutaAviso);
     Notifications.clearLastNotificationResponseAsync().catch(() => {});
   }, [respuesta]);
 }
 
 export type EstadoPermiso = "concedido" | "pendiente" | "denegado";
 
-const aEstado = (p: Notifications.NotificationPermissionsStatus): EstadoPermiso =>
+const aEstado = (p: N.NotificationPermissionsStatus): EstadoPermiso =>
   p.granted ? "concedido" : p.canAskAgain ? "pendiente" : "denegado";
 
 /** Estado del permiso de notificaciones, para Usuario; se actualiza al volver a la app. */

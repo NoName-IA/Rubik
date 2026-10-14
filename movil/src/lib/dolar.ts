@@ -94,6 +94,17 @@ export function periodo(t: Trm, dias: number, hoy: string): Periodo | null {
   return { puntos, minimo, maximo, cambioPct: ((puntos[puntos.length - 1].valor - puntos[0].valor) / puntos[0].valor) * 100 };
 }
 
+/**
+ * Índice del punto de la gráfica más cercano a donde está el dedo. Los `n` puntos van repartidos
+ * a lo ancho, dejando `margen` a cada lado; fuera de la gráfica se queda en el primero o el último.
+ */
+export function puntoCercano(xToque: number, ancho: number, n: number, margen = 0): number {
+  const util = ancho - margen * 2;
+  if (n < 2 || util <= 0) return 0;
+  const i = Math.round(((xToque - margen) / util) * (n - 1));
+  return Math.min(n - 1, Math.max(0, i));
+}
+
 // --- Formato colombiano ----------------------------------------------------------------
 
 function miles(entero: string): string {

@@ -2,12 +2,14 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { FranjaHoras } from "@/components/clima/FranjaHoras";
 import { Panel } from "@/components/Panel";
-import { iconoClima, textoClima } from "@/lib/clima/codigos";
+import { IconoTiempo } from "@/components/clima/IconoTiempo";
+import { textoClima } from "@/lib/clima/codigos";
 import { ahoraLocal, grados, proximasHoras } from "@/lib/clima/formato";
 import { horasDelDia, milimetros, rangoSemana } from "@/lib/clima/lluvia";
 import type { Pronostico } from "@/lib/clima/tipos";
@@ -33,7 +35,7 @@ export function Semana({ p }: { p: Pronostico }) {
         const horas = d.fecha === hoy ? proximasHoras(p, 24).filter((h) => h.hora.startsWith(hoy)) : horasDelDia(p, d.fecha);
         return (
           <View key={d.fecha} style={i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.borde }}>
-            <Pressable
+            <Presionable
               onPress={() => setAbierto(estaAbierto ? null : d.fecha)}
               accessibilityRole="button"
               accessibilityState={{ expanded: estaAbierto }}
@@ -43,7 +45,7 @@ export function Semana({ p }: { p: Pronostico }) {
               <Text style={[styles.nombre, { color: c.tinta }]} numberOfLines={1}>
                 {nombre}
               </Text>
-              <Ionicons name={iconoClima(d.codigo)} size={22} color={c.tinta} />
+              <IconoTiempo codigo={d.codigo} tamano={26} />
               <View style={styles.lluvia}>
                 <Text style={[styles.prob, { color: prob >= 50 ? c.enfasis : c.apagado }]}>{prob} %</Text>
                 <Text style={{ color: c.apagado, fontSize: 11 }}>{d.mm >= 0.1 ? milimetros(d.mm) : " "}</Text>
@@ -54,7 +56,7 @@ export function Semana({ p }: { p: Pronostico }) {
               </View>
               <Text style={[styles.temp, { color: c.tinta, fontWeight: "700" }]}>{grados(d.maxima)}</Text>
               <Ionicons name={estaAbierto ? "chevron-up" : "chevron-down"} size={16} color={c.apagado} />
-            </Pressable>
+            </Presionable>
             {estaAbierto ? (
               <View style={styles.detalle}>
                 <Text style={{ color: c.tinta2, fontSize: 13 }}>{textoClima(d.codigo)}</Text>

@@ -2,8 +2,9 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Animated, Platform, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { Animated, Platform, StyleSheet, View, type ViewStyle } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { espacio, radio, useColores } from "@/theme";
 
@@ -43,13 +44,13 @@ export function MensajeError({
       <Ionicons name="cloud-offline-outline" size={32} color={c.alerta} />
       <Text style={[styles.texto, { color: c.tinta }]}>{titulo}</Text>
       <Text style={[styles.detalle, { color: c.tinta2 }]}>{mensaje}</Text>
-      <Pressable
+      <Presionable
         onPress={alReintentar}
         accessibilityRole="button"
         style={({ pressed }) => [styles.boton, { backgroundColor: c.enfasis, opacity: pressed ? 0.8 : 1 }]}
       >
         <Text style={[styles.textoBoton, { color: c.sobreEnfasis }]}>Reintentar</Text>
-      </Pressable>
+      </Presionable>
     </View>
   );
 }

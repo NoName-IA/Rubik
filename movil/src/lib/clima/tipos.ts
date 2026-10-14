@@ -23,6 +23,8 @@ export interface Actual {
 export interface Hora {
   hora: HoraLocal;
   temperatura: number;
+  /** Sensación térmica. Falta en pronósticos guardados por versiones anteriores de la app. */
+  sensacion?: number;
   probabilidad: number | null;
   mm: number;
   codigo: number;

@@ -7,9 +7,11 @@ import { StyleSheet, View } from "react-native";
 import { Text } from "@/components/Texto";
 import { TarjetaAire } from "@/components/aire/TarjetaAire";
 import { FranjaHoras } from "@/components/clima/FranjaHoras";
-import { resumenDelDia } from "@/hooks/usePronostico";
+import { resumenDelDia, useObservacion } from "@/hooks/usePronostico";
 import { Panel } from "@/components/Panel";
-import { iconoClima, textoClima } from "@/lib/clima/codigos";
+import { IconoTiempo } from "@/components/clima/IconoTiempo";
+import { textoClima } from "@/lib/clima/codigos";
+import { codigoActual } from "@/lib/clima/metar";
 import { ahoraLocal, categoriaUv, formatoHoraMinutos, grados, haceCuanto, proximasHoras } from "@/lib/clima/formato";
 import type { Pronostico } from "@/lib/clima/tipos";
 import { espacio, fuente, radio, useColores } from "@/theme";
@@ -19,20 +21,23 @@ export function ClimaHoy({ p }: { p: Pronostico }) {
   const hoy = p.dias.find((d) => d.fecha === ahoraLocal(p.desfaseUtc).slice(0, 10)) ?? p.dias[0];
   const horas = proximasHoras(p, 12);
   const a = p.actual;
+  const obs = useObservacion();
+  // Si el aeropuerto cercano contradice al pronóstico, se muestra lo que reporta.
+  const codigo = codigoActual(a.codigo, obs);
 
   return (
     <>
       <Panel>
         <View style={styles.principal}>
-          <Ionicons name={iconoClima(a.codigo, a.esDia)} size={64} color={c.enfasis} />
+          <IconoTiempo codigo={codigo} esDia={a.esDia} tamano={64} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.temperatura, { color: c.tinta }]} accessibilityLabel={`${Math.round(a.temperatura)} grados`}>
               {grados(a.temperatura)}
             </Text>
-            <Text style={[styles.descripcion, { color: c.tinta }]}>{textoClima(a.codigo)}</Text>
+            <Text style={[styles.descripcion, { color: c.tinta }]}>{textoClima(codigo)}</Text>
           </View>
         </View>
-        <Text style={[styles.frase, { color: c.tinta }]}>{resumenDelDia(p).frase}</Text>
+        <Text style={[styles.frase, { color: c.tinta }]}>{resumenDelDia(p, null, obs).frase}</Text>
         <Text style={{ color: c.tinta2, fontSize: 15 }}>
           Se siente como <Text style={{ color: c.tinta, fontWeight: "700" }}>{grados(a.sensacion)}</Text>
           {hoy ? ` · Máx. ${grados(hoy.maxima)} · Mín. ${grados(hoy.minima)}` : ""}

@@ -3,9 +3,10 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { type ReactNode, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { Fondo } from "@/components/Fondo";
 import { ListaCiudades } from "@/components/ListaCiudades";
@@ -83,9 +84,9 @@ export function Bienvenida() {
         <ScrollView style={{ flex: 1 }}>
           <ListaCiudades elegida={null} alElegir={elegirCiudad} />
         </ScrollView>
-        <Pressable onPress={() => setPaso("ubicacion")} accessibilityRole="button" style={styles.botonSecundario}>
+        <Presionable onPress={() => setPaso("ubicacion")} accessibilityRole="button" style={styles.botonSecundario}>
           <Text style={[styles.textoSecundario, { color: c.enfasis }]}>Volver</Text>
-        </Pressable>
+        </Presionable>
       </Marco>
     );
   }
@@ -107,9 +108,9 @@ export function Bienvenida() {
       </View>
       <View style={styles.botones}>
         <Boton texto="Usar mi ubicación (GPS)" alTocar={usarGps} cargando={pidiendo} />
-        <Pressable onPress={() => setPaso("ciudad")} accessibilityRole="button" style={styles.botonSecundario}>
+        <Presionable onPress={() => setPaso("ciudad")} accessibilityRole="button" style={styles.botonSecundario}>
           <Text style={[styles.textoSecundario, { color: c.enfasis }]}>Elegir mi ciudad</Text>
-        </Pressable>
+        </Presionable>
       </View>
     </Marco>
   );
@@ -137,7 +138,7 @@ function Icono({ nombre }: { nombre: "person" | "location" }) {
 function Boton({ texto, alTocar, cargando = false }: { texto: string; alTocar: () => void; cargando?: boolean }) {
   const c = useColores();
   return (
-    <Pressable
+    <Presionable
       onPress={alTocar}
       disabled={cargando}
       accessibilityRole="button"
@@ -148,7 +149,7 @@ function Boton({ texto, alTocar, cargando = false }: { texto: string; alTocar: (
       ) : (
         <Text style={[styles.textoBoton, { color: c.sobreEnfasis }]}>{texto}</Text>
       )}
-    </Pressable>
+    </Presionable>
   );
 }
 

@@ -1,8 +1,11 @@
 // Usuario: preferencias guardadas en el celular (sin cuenta ni inicio de sesión).
 
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Constants from "expo-constants";
-import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
+import { useState } from "react";
+import { StyleSheet, TextInput, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { ListaCiudades } from "@/components/ListaCiudades";
 import { Pantalla } from "@/components/Pantalla";
@@ -11,18 +14,13 @@ import { Segmentos } from "@/components/Segmentos";
 import { usePreferencias } from "@/contexto/Preferencias";
 import { useUbicacion } from "@/contexto/Ubicacion";
 import { usePermisoAvisos } from "@/hooks/useAvisos";
-import { NIVELES_ARROYOS, type SensibilidadArroyos } from "@/lib/preferencias";
+import { buscarCiudad, CIUDAD_INICIAL } from "@/lib/ciudades";
 import { espacio, fuente, radio, useColores } from "@/theme";
 
 const UBICACIONES = [
   { clave: "gps", titulo: "Mi ubicación (GPS)" },
   { clave: "ciudad", titulo: "Elegir ciudad" },
 ] as const;
-
-const SENSIBILIDADES = (Object.keys(NIVELES_ARROYOS) as SensibilidadArroyos[]).map((clave) => ({
-  clave,
-  titulo: NIVELES_ARROYOS[clave].nombre,
-}));
 
 const TEMAS = [
   { clave: "sistema", titulo: "Sistema" },
@@ -33,7 +31,7 @@ const TEMAS = [
 export default function Usuario() {
   const c = useColores();
   const { preferencias: p, cambiar } = usePreferencias();
-  const { permiso, pedirPermiso, origen, nombre: lugar, arroyos } = useUbicacion();
+  const { permiso, pedirPermiso, origen, nombre: lugar } = useUbicacion();
   const permisoAvisos = usePermisoAvisos();
 
   return (
@@ -63,59 +61,29 @@ export default function Usuario() {
                 : `Aún no hay ubicación: se usa ${lugar}.`}
         </Text>
         {p.ubicacion === "gps" && origen !== "gps" ? (
-          <Pressable onPress={pedirPermiso} accessibilityRole="button" style={styles.boton}>
+          <Presionable onPress={pedirPermiso} accessibilityRole="button" style={styles.boton}>
             <Text style={{ color: c.enfasis, fontWeight: "600" }}>
               {permiso === "denegado" ? "Dar permiso de ubicación" : "Usar mi ubicación"}
             </Text>
-          </Pressable>
+          </Presionable>
         ) : null}
-        {p.ubicacion === "ciudad" ? <ListaCiudades elegida={p.ciudad} alElegir={(ciudad) => cambiar({ ciudad })} /> : null}
+        {p.ubicacion === "ciudad" ? <ElegirCiudad elegida={p.ciudad} alElegir={(ciudad) => cambiar({ ciudad })} /> : null}
       </Panel>
 
-      <Panel titulo="Alerta de arroyos">
-        {arroyos ? (
-          <>
-            <Segmentos opciones={SENSIBILIDADES} valor={p.arroyos} alCambiar={(a) => cambiar({ arroyos: a })} dentroDePanel />
-            <Text style={[styles.nota, { color: c.tinta2 }]}>{NIVELES_ARROYOS[p.arroyos].descripcion}</Text>
-          </>
-        ) : (
+      {permisoAvisos.estado && permisoAvisos.estado !== "concedido" ? (
+        <Panel titulo="Notificaciones">
           <Text style={[styles.nota, { color: c.tinta2 }]}>
-            Los arroyos son propios del área metropolitana de Barranquilla (Barranquilla, Soledad, Malambo, Puerto
-            Colombia y Galapa). En {lugar} la alerta no aplica.
+            {permisoAvisos.estado === "denegado"
+              ? "Las notificaciones están bloqueadas para Rubik en los ajustes del celular."
+              : "Falta el permiso para avisarte de lluvia, arroyos, calor y aire limpio."}
           </Text>
-        )}
-      </Panel>
-
-      <Panel titulo="Notificaciones">
-        <Interruptor
-          titulo="Antes de que llueva"
-          detalle="30 minutos antes, entre 6 a. m. y 10 p. m."
-          valor={p.avisos.lluvia}
-          alCambiar={(lluvia) => cambiar((x) => ({ ...x, avisos: { ...x.avisos, lluvia } }))}
-        />
-        {arroyos ? (
-          <Interruptor
-            titulo="Riesgo de arroyos"
-            detalle="1 hora antes, a cualquier hora, con la sensibilidad de arriba."
-            valor={p.avisos.arroyos}
-            alCambiar={(a) => cambiar((x) => ({ ...x, avisos: { ...x.avisos, arroyos: a } }))}
-          />
-        ) : null}
-        {(p.avisos.lluvia || (arroyos && p.avisos.arroyos)) && permisoAvisos.estado && permisoAvisos.estado !== "concedido" ? (
-          <>
-            <Text style={[styles.nota, { color: c.tinta2 }]}>
-              {permisoAvisos.estado === "denegado"
-                ? "Las notificaciones están bloqueadas para Rubik en los ajustes del celular."
-                : "Falta el permiso para mostrar notificaciones."}
+          <Presionable onPress={permisoAvisos.pedir} accessibilityRole="button" style={styles.boton}>
+            <Text style={{ color: c.enfasis, fontWeight: "600" }}>
+              {permisoAvisos.estado === "denegado" ? "Abrir ajustes" : "Permitir notificaciones"}
             </Text>
-            <Pressable onPress={permisoAvisos.pedir} accessibilityRole="button" style={styles.boton}>
-              <Text style={{ color: c.enfasis, fontWeight: "600" }}>
-                {permisoAvisos.estado === "denegado" ? "Abrir ajustes" : "Permitir notificaciones"}
-              </Text>
-            </Pressable>
-          </>
-        ) : null}
-      </Panel>
+          </Presionable>
+        </Panel>
+      ) : null}
 
       <Panel titulo="Tema">
         <Segmentos opciones={TEMAS} valor={p.tema} alCambiar={(tema) => cambiar({ tema })} dentroDePanel />
@@ -135,22 +103,37 @@ export default function Usuario() {
   );
 }
 
-function Interruptor({ titulo, detalle, valor, alCambiar }: { titulo: string; detalle: string; valor: boolean; alCambiar: (v: boolean) => void }) {
+/** La ciudad elegida en una fila; la lista completa se despliega solo al tocar "Cambiar" y se cierra al elegir. */
+function ElegirCiudad({ elegida, alElegir }: { elegida: string; alElegir: (id: string) => void }) {
   const c = useColores();
-  return (
-    <View style={styles.fila}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: c.tinta, fontWeight: "600" }}>{titulo}</Text>
-        <Text style={[styles.nota, { color: c.tinta2 }]}>{detalle}</Text>
-      </View>
-      <Switch
-        value={valor}
-        onValueChange={alCambiar}
-        accessibilityLabel={titulo}
-        trackColor={{ false: c.borde, true: c.enfasis }}
-        thumbColor={c.tinta}
+  const [abierta, setAbierta] = useState(false);
+  const ciudad = buscarCiudad(elegida) ?? CIUDAD_INICIAL;
+
+  if (abierta) {
+    return (
+      <ListaCiudades
+        elegida={elegida}
+        alElegir={(id) => {
+          alElegir(id);
+          setAbierta(false);
+        }}
       />
-    </View>
+    );
+  }
+  return (
+    <Presionable
+      onPress={() => setAbierta(true)}
+      accessibilityRole="button"
+      accessibilityLabel={`Ciudad: ${ciudad.nombre}, ${ciudad.departamento}. Cambiar`}
+      style={[styles.ciudad, { borderColor: c.borde, backgroundColor: c.fondo }]}
+    >
+      <Ionicons name="location-outline" size={20} color={c.enfasis} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: c.tinta, fontSize: 15, fontWeight: "700" }}>{ciudad.nombre}</Text>
+        <Text style={{ color: c.tinta2, fontSize: 12 }}>{ciudad.departamento}</Text>
+      </View>
+      <Text style={{ color: c.enfasis, fontWeight: "600" }}>Cambiar</Text>
+    </Presionable>
   );
 }
 
@@ -158,5 +141,13 @@ const styles = StyleSheet.create({
   entrada: { fontFamily: fuente.texto, borderWidth: 1, borderRadius: radio.s, paddingHorizontal: espacio.m, minHeight: 44, fontSize: 16 },
   nota: { fontSize: 13, lineHeight: 18 },
   boton: { minHeight: 40, justifyContent: "center" },
-  fila: { flexDirection: "row", alignItems: "center", gap: espacio.m, minHeight: 48 },
+  ciudad: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: espacio.m,
+    minHeight: 52,
+    paddingHorizontal: espacio.m,
+    borderWidth: 1,
+    borderRadius: radio.s,
+  },
 });

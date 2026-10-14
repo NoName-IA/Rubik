@@ -1,5 +1,5 @@
 // Navbar inferior: exactamente 4 pestañas. Todo lo demás entra por los accesos rápidos de Inicio.
-// La barra es BarraLiquida (efecto líquido al cambiar de pestaña, estilo de portfolio_web).
+// La barra es BarraLiquida (estilo de portfolio_web).
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router/tabs";

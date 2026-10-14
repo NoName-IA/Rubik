@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { iconoClima, textoClima } from "../src/lib/clima/codigos.ts";
+import { textoClima, tipoIcono } from "../src/lib/clima/codigos.ts";
+import { ICONOS_TIEMPO, ICONOS_TIEMPO_CLARO } from "../src/lib/clima/iconosTiempo.ts";
 import {
   ahoraLocal,
   categoriaUv,
@@ -54,6 +55,28 @@ test("los valores nulos de lluvia se vuelven 0 mm y probabilidad nula", () => {
   const h = convertir(r, 0).horas[0];
   assert.equal(h.mm, 0);
   assert.equal(h.probabilidad, null);
+});
+
+test("íconos del tiempo: uno por tipo, con ids propios y sin referencias rotas", () => {
+  const codigos = [0, 1, 2, 3, 45, 48, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99];
+  const tipos = new Set(codigos.flatMap((c) => [tipoIcono(c, true), tipoIcono(c, false)]));
+  for (const tipo of tipos) {
+    const xml = ICONOS_TIEMPO[tipo];
+    assert.ok(xml?.startsWith("<svg"), tipo);
+    assert.ok(xml.includes('viewBox="0 0 48 48"'), tipo);
+    const ids = new Set([...xml.matchAll(/id="([^"]+)"/g)].map((m) => m[1]));
+    for (const id of ids) assert.ok(id.startsWith(`it-${tipo}-`), `${tipo}: ${id}`);
+    for (const [, ref] of xml.matchAll(/url\(#([^)]+)\)/g)) assert.ok(ids.has(ref), `${tipo}: falta #${ref}`);
+  }
+  assert.equal(Object.keys(ICONOS_TIEMPO).length, tipos.size);
+});
+
+test("en tema claro las nubes van más oscuras y las máscaras no cambian", () => {
+  assert.deepEqual(Object.keys(ICONOS_TIEMPO_CLARO), Object.keys(ICONOS_TIEMPO));
+  assert.ok(ICONOS_TIEMPO.lluvia.includes('stop-color="#E3E3E3"'));
+  assert.ok(!ICONOS_TIEMPO_CLARO.lluvia.includes('stop-color="#E3E3E3"'));
+  assert.ok(ICONOS_TIEMPO_CLARO.nube.includes('<mask id="it-nube-c" fill="#fff">'));
+  assert.equal(ICONOS_TIEMPO_CLARO.sol, ICONOS_TIEMPO.sol);
 });
 
 test("hora local del lugar sin importar la zona del celular", () => {
@@ -107,13 +130,26 @@ test("códigos de tiempo: texto e ícono de día y de noche", () => {
   // Fuera de Europa Central, Open-Meteo no pronostica granizo de forma confiable.
   assert.equal(textoClima(96), "Tormenta eléctrica fuerte");
   assert.equal(textoClima(12345), "Sin dato");
-  assert.equal(iconoClima(0, true), "sunny-outline");
-  assert.equal(iconoClima(0, false), "moon-outline");
-  assert.equal(iconoClima(2, false), "cloudy-night-outline");
-  assert.equal(iconoClima(63), "rainy-outline");
-  assert.equal(iconoClima(82), "rainy-outline");
-  assert.equal(iconoClima(96), "thunderstorm-outline");
-  assert.equal(iconoClima(73), "snow-outline");
+  assert.equal(tipoIcono(0, true), "sol");
+  assert.equal(tipoIcono(0, false), "luna");
+  assert.equal(tipoIcono(1, true), "casiDespejadoDia");
+  assert.equal(tipoIcono(1, false), "casiDespejadoNoche");
+  assert.equal(tipoIcono(2, true), "solNube");
+  assert.equal(tipoIcono(2, false), "lunaNube");
+  assert.equal(tipoIcono(3), "nube");
+  assert.equal(tipoIcono(45), "niebla");
+  assert.equal(tipoIcono(53), "llovizna");
+  assert.equal(tipoIcono(63), "lluvia");
+  assert.equal(tipoIcono(65), "lluviaFuerte");
+  assert.equal(tipoIcono(81, true), "chubascoDia");
+  assert.equal(tipoIcono(80, false), "chubascoNoche");
+  assert.equal(tipoIcono(82, true), "lluviaFuerte");
+  assert.equal(tipoIcono(95, true), "tormentaDia");
+  assert.equal(tipoIcono(95, false), "tormentaNoche");
+  assert.equal(tipoIcono(96), "tormentaFuerte");
+  assert.equal(tipoIcono(73), "nieve");
+  assert.equal(tipoIcono(75), "nevadaFuerte");
+  assert.equal(tipoIcono(12345), "nube");
   // Todos los códigos de la respuesta real tienen texto.
   for (const h of p.horas) assert.notEqual(textoClima(h.codigo), "Sin dato", `código ${h.codigo}`);
 });

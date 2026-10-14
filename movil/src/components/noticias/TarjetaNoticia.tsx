@@ -1,7 +1,8 @@
 // Una noticia: foto grande arriba, titular, medio y hace cuánto. Abre el artículo original.
 
-import { Image, Linking, Pressable, StyleSheet, View } from "react-native";
+import { Image, Linking, StyleSheet, View } from "react-native";
 
+import { Presionable } from "@/components/Movimiento";
 import { Text } from "@/components/Texto";
 import { antiguedad } from "@/lib/noticias/combinar";
 import type { Noticia } from "@/lib/noticias/fuentes";
@@ -15,7 +16,7 @@ export function abrirNoticia(n: Noticia) {
 export function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
   const c = useColores();
   return (
-    <Pressable
+    <Presionable
       onPress={() => abrirNoticia(n)}
       accessibilityRole="link"
       accessibilityLabel={`${n.titulo}. ${n.medio}, ${antiguedad(n.fecha, ahora)}`}
@@ -38,7 +39,7 @@ export function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
           {n.medio} · {antiguedad(n.fecha, ahora)}
         </Text>
       </View>
-    </Pressable>
+    </Presionable>
   );
 }
 

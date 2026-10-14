@@ -1,15 +1,26 @@
-// Códigos de tiempo WMO (los usa Open-Meteo) → texto en español e ícono de Ionicons.
+// Códigos de tiempo WMO (los usa Open-Meteo) → texto en español y tipo de ícono (lo dibuja IconoTiempo).
 // https://open-meteo.com/en/docs (sección "WMO Weather interpretation codes")
 
-export type IconoClima =
-  | "sunny-outline"
-  | "moon-outline"
-  | "partly-sunny-outline"
-  | "cloudy-night-outline"
-  | "cloudy-outline"
-  | "rainy-outline"
-  | "thunderstorm-outline"
-  | "snow-outline";
+export type TipoIcono =
+  | "sol"
+  | "luna"
+  | "casiDespejadoDia"
+  | "casiDespejadoNoche"
+  | "solNube"
+  | "lunaNube"
+  | "nube"
+  | "niebla"
+  | "llovizna"
+  | "lluvia"
+  | "lluviaFuerte"
+  | "chubascoDia"
+  | "chubascoNoche"
+  | "nieve"
+  | "nevadaFuerte"
+  /** Tormenta leve o moderada (código 95): tormentas aisladas con sol o luna. */
+  | "tormentaDia"
+  | "tormentaNoche"
+  | "tormentaFuerte";
 
 const TEXTOS: Record<number, string> = {
   0: "Despejado",
@@ -48,12 +59,18 @@ export function textoClima(codigo: number): string {
   return TEXTOS[codigo] ?? "Sin dato";
 }
 
-export function iconoClima(codigo: number, esDia = true): IconoClima {
-  if (codigo === 0) return esDia ? "sunny-outline" : "moon-outline";
-  if (codigo === 1 || codigo === 2) return esDia ? "partly-sunny-outline" : "cloudy-night-outline";
-  if (codigo === 3 || codigo === 45 || codigo === 48) return "cloudy-outline";
-  if (codigo >= 95) return "thunderstorm-outline";
-  if ((codigo >= 71 && codigo <= 77) || codigo === 85 || codigo === 86) return "snow-outline";
-  if (codigo >= 51 && codigo <= 82) return "rainy-outline";
-  return "cloudy-outline";
+export function tipoIcono(codigo: number, esDia = true): TipoIcono {
+  if (codigo === 0) return esDia ? "sol" : "luna";
+  if (codigo === 1) return esDia ? "casiDespejadoDia" : "casiDespejadoNoche";
+  if (codigo === 2) return esDia ? "solNube" : "lunaNube";
+  if (codigo === 45 || codigo === 48) return "niebla";
+  if (codigo === 95) return esDia ? "tormentaDia" : "tormentaNoche";
+  if (codigo === 96 || codigo === 99) return "tormentaFuerte";
+  if (codigo === 75 || codigo === 86) return "nevadaFuerte";
+  if ((codigo >= 71 && codigo <= 77) || codigo === 85) return "nieve";
+  if (codigo >= 51 && codigo <= 57) return "llovizna";
+  if (codigo === 65 || codigo === 67 || codigo === 82) return "lluviaFuerte";
+  if (codigo >= 61 && codigo <= 66) return "lluvia";
+  if (codigo === 80 || codigo === 81) return esDia ? "chubascoDia" : "chubascoNoche";
+  return "nube";
 }
