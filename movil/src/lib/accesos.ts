@@ -9,12 +9,13 @@ export interface Acceso {
   titulo: string;
   icono: ComponentProps<typeof Ionicons>["name"];
   /** Ruta de Expo Router; sin ruta, la tarjeta se muestra como "Próximamente". */
-  ruta?: "/noticias";
+  ruta?: "/noticias" | "/pong";
   /** Dato corto bajo el título mientras no llega el dato vivo (ver `detalles` en Carrusel). */
   detalle: string;
 }
 
 export const ACCESOS: Acceso[] = [
   { clave: "noticias", titulo: "Noticias", icono: "newspaper-outline", ruta: "/noticias", detalle: "Lo último de la ciudad" },
+  { clave: "pong", titulo: "Rubo", icono: "game-controller-outline", ruta: "/pong", detalle: "Tú contra la máquina" },
   { clave: "pronto", titulo: "Más pronto", icono: "add-circle-outline", detalle: "Nuevas funciones" },
 ];

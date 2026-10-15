@@ -1,5 +1,6 @@
 // Una noticia: foto grande arriba, titular, medio y hace cuánto. Abre el artículo original.
 
+import { memo } from "react";
 import { Image, Linking, StyleSheet, View } from "react-native";
 
 import { Presionable } from "@/components/Movimiento";
@@ -12,8 +13,11 @@ export function abrirNoticia(n: Noticia) {
   Linking.openURL(n.url).catch(() => {});
 }
 
-/** `ahora`: momento de referencia para "hace 2 h" (la hora de la descarga). */
-export function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
+/**
+ * `ahora`: momento de referencia para "hace 2 h" (la hora de la descarga). Memorizada: al refrescar o
+ * cambiar de zona solo se dibujan las tarjetas que cambiaron.
+ */
+export const TarjetaNoticia = memo(function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
   const c = useColores();
   return (
     <Presionable
@@ -28,6 +32,8 @@ export function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
           source={{ uri: n.imagen }}
           style={[styles.imagen, { backgroundColor: c.borde }]}
           resizeMode="cover"
+          // Android: decodifica la foto al tamaño de la tarjeta, no al original (menos memoria y menos tirones al bajar).
+          resizeMethod="resize"
           accessibilityIgnoresInvertColors
         />
       ) : null}
@@ -41,7 +47,7 @@ export function TarjetaNoticia({ n, ahora }: { n: Noticia; ahora: number }) {
       </View>
     </Presionable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   tarjeta: {

@@ -1,8 +1,9 @@
 // Barra de segmentos (p. ej. Hoy · Lluvia · 7 días). La opción elegida se marca con una pastilla que
 // se desliza "líquida" hasta la nueva: viaja con un resorte casi sin rebote y se estira un poco
-// mientras se mueve.
+// mientras se mueve. Una opción puede ir bloqueada (no se puede elegir) y llevar un adorno encima,
+// p. ej. las cadenas del modo IA del Rubo.
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Animated, Easing, type LayoutChangeEvent, Platform, StyleSheet, View } from "react-native";
 
 import { movimientoReducido, Presionable } from "@/components/Movimiento";
@@ -20,12 +21,21 @@ export function Segmentos<T extends string>({
   valor,
   alCambiar,
   dentroDePanel = false,
+  bloqueadas = [],
+  adornos = {},
+  alTocarBloqueada,
 }: {
   opciones: readonly { clave: T; titulo: string }[];
   valor: T;
   alCambiar: (v: T) => void;
   /** Sin margen lateral (cuando ya está dentro de un Panel). */
   dentroDePanel?: boolean;
+  /** Opciones que se ven apagadas y no se pueden elegir. */
+  bloqueadas?: readonly T[];
+  /** Algo que se dibuja encima de una opción (no recibe toques). */
+  adornos?: Partial<Record<T, ReactNode>>;
+  /** Si se da, tocar una opción bloqueada avisa aquí (sin elegirla); si no, no se puede tocar. */
+  alTocarBloqueada?: (v: T) => void;
 }) {
   const c = useColores();
   const indice = Math.max(0, opciones.findIndex((o) => o.clave === valor));
@@ -56,7 +66,12 @@ export function Segmentos<T extends string>({
 
   return (
     <View
-      style={[styles.segmentos, dentroDePanel && { marginHorizontal: 0 }, { backgroundColor: c.superficie, borderColor: c.borde }]}
+      // Dentro de un Panel no lleva fondo propio: toma el del panel (que puede ser translúcido).
+      style={[
+        styles.segmentos,
+        { backgroundColor: dentroDePanel ? "transparent" : c.superficie, borderColor: c.borde },
+        dentroDePanel && { marginHorizontal: 0 },
+      ]}
       role="tablist"
     >
       <View style={styles.fila} onLayout={(e: LayoutChangeEvent) => setAncho(e.nativeEvent.layout.width)}>
@@ -80,18 +95,27 @@ export function Segmentos<T extends string>({
         ) : null}
         {opciones.map((o, i) => {
           const elegida = i === indice;
+          const bloqueada = bloqueadas.includes(o.clave);
           return (
             <Presionable
               key={o.clave}
-              onPress={() => alCambiar(o.clave)}
+              onPress={() => (bloqueada ? alTocarBloqueada?.(o.clave) : alCambiar(o.clave))}
+              disabled={bloqueada && !alTocarBloqueada}
               role="tab"
               aria-selected={elegida}
+              aria-disabled={bloqueada}
+              accessibilityLabel={bloqueada ? `${o.titulo}, bloqueado` : undefined}
               // Hasta medir el ancho no hay pastilla: se marca la opción como antes.
               style={[styles.segmento, elegida && ancho === 0 && { backgroundColor: c.enfasisSuave, borderColor: c.enfasis }]}
             >
-              <Text style={[styles.texto, { color: elegida ? c.tinta : c.tinta2 }]} numberOfLines={1}>
+              <Text style={[styles.texto, { color: bloqueada ? c.apagado : elegida ? c.tinta : c.tinta2 }]} numberOfLines={1}>
                 {o.titulo}
               </Text>
+              {adornos[o.clave] ? (
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  {adornos[o.clave]}
+                </View>
+              ) : null}
             </Presionable>
           );
         })}

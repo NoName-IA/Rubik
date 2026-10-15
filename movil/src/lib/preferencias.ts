@@ -15,6 +15,8 @@ export interface Preferencias {
   ciudad: string;
   arroyos: SensibilidadArroyos;
   tema: Tema;
+  /** RuboKill: al perder contra la IA en el Rubo, la foto de Rubo en toda la pantalla. Apagado al empezar. */
+  rubokill: boolean;
 }
 
 export const PREFERENCIAS_INICIALES: Preferencias = {
@@ -23,6 +25,7 @@ export const PREFERENCIAS_INICIALES: Preferencias = {
   ciudad: CIUDAD_INICIAL.id,
   arroyos: "normal",
   tema: "sistema",
+  rubokill: false,
 };
 
 /**
@@ -69,6 +72,7 @@ export function leerPreferencias(texto: string | null): Preferencias {
     ciudad: antigua ? "barranquilla" : ciudad,
     arroyos: uno(g.arroyos, ["mas", "normal", "menos"] as const, "normal"),
     tema: uno(g.tema, ["sistema", "claro", "oscuro"] as const, "sistema"),
+    rubokill: g.rubokill === true,
   };
 }
 

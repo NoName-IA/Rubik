@@ -79,7 +79,7 @@ export function Bienvenida() {
     return (
       <Marco>
         <Text style={[styles.titulo, { color: c.tinta, marginBottom: espacio.s }]} accessibilityRole="header">
-          Elige tu ciudad
+          Elige tu ciudad y municipio
         </Text>
         <ScrollView style={{ flex: 1 }}>
           <ListaCiudades elegida={null} alElegir={elegirCiudad} />

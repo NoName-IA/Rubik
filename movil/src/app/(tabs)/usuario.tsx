@@ -14,12 +14,18 @@ import { Segmentos } from "@/components/Segmentos";
 import { usePreferencias } from "@/contexto/Preferencias";
 import { useUbicacion } from "@/contexto/Ubicacion";
 import { usePermisoAvisos } from "@/hooks/useAvisos";
-import { buscarCiudad, CIUDAD_INICIAL } from "@/lib/ciudades";
+import { useIaDesbloqueada } from "@/hooks/useVictoriasRubo";
+import { buscarArea, buscarCiudad, CIUDAD_INICIAL } from "@/lib/ciudades";
 import { espacio, fuente, radio, useColores } from "@/theme";
 
 const UBICACIONES = [
   { clave: "gps", titulo: "Mi ubicación (GPS)" },
   { clave: "ciudad", titulo: "Elegir ciudad" },
+] as const;
+
+const RUBOKILL = [
+  { clave: "no", titulo: "Desactivado" },
+  { clave: "si", titulo: "Activado" },
 ] as const;
 
 const TEMAS = [
@@ -33,6 +39,8 @@ export default function Usuario() {
   const { preferencias: p, cambiar } = usePreferencias();
   const { permiso, pedirPermiso, origen, nombre: lugar } = useUbicacion();
   const permisoAvisos = usePermisoAvisos();
+  // RuboKill solo aparece cuando ya desbloqueaste el modo IA del Rubo (2 victorias en normal).
+  const iaDesbloqueada = useIaDesbloqueada();
 
   return (
     <Pantalla titulo="Usuario" subtitulo="Tus preferencias se guardan solo en este celular.">
@@ -89,6 +97,18 @@ export default function Usuario() {
         <Segmentos opciones={TEMAS} valor={p.tema} alCambiar={(tema) => cambiar({ tema })} dentroDePanel />
       </Panel>
 
+      {iaDesbloqueada ? (
+        <Panel titulo="RuboKill">
+          <Segmentos
+            opciones={RUBOKILL}
+            valor={p.rubokill ? "si" : "no"}
+            alCambiar={(v) => cambiar({ rubokill: v === "si" })}
+            dentroDePanel
+          />
+          <Text style={[styles.nota, { color: c.tinta2 }]}>Si pierdes contra la IA en el Rubo, Rubo aparece en toda la pantalla.</Text>
+        </Panel>
+      ) : null}
+
       <Panel titulo="Acerca de">
         <Text style={[styles.nota, { color: c.tinta2 }]}>
           Cada noticia se abre en el sitio del medio que la publicó.
@@ -106,6 +126,9 @@ function ElegirCiudad({ elegida, alElegir }: { elegida: string; alElegir: (id: s
   const c = useColores();
   const [abierta, setAbierta] = useState(false);
   const ciudad = buscarCiudad(elegida) ?? CIUDAD_INICIAL;
+  const area = buscarArea(ciudad.area);
+  // Un municipio que no es la ciudad misma dice a qué ciudad pertenece.
+  const detalle = area && area.id !== ciudad.id ? `${area.nombre} · ${ciudad.departamento}` : ciudad.departamento;
 
   if (abierta) {
     return (
@@ -122,13 +145,13 @@ function ElegirCiudad({ elegida, alElegir }: { elegida: string; alElegir: (id: s
     <Presionable
       onPress={() => setAbierta(true)}
       accessibilityRole="button"
-      accessibilityLabel={`Ciudad: ${ciudad.nombre}, ${ciudad.departamento}. Cambiar`}
+      accessibilityLabel={`Municipio: ${ciudad.nombre}, ${detalle}. Cambiar`}
       style={[styles.ciudad, { borderColor: c.borde, backgroundColor: c.fondo }]}
     >
       <Ionicons name="location-outline" size={20} color={c.enfasis} />
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.tinta, fontSize: 15, fontWeight: "700" }}>{ciudad.nombre}</Text>
-        <Text style={{ color: c.tinta2, fontSize: 12 }}>{ciudad.departamento}</Text>
+        <Text style={{ color: c.tinta2, fontSize: 12 }}>{detalle}</Text>
       </View>
       <Text style={{ color: c.enfasis, fontWeight: "600" }}>Cambiar</Text>
     </Presionable>

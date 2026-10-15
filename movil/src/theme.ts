@@ -27,6 +27,9 @@ const oscuro = {
   inactivo: "rgba(167, 139, 250, 0.6)",
   alerta: "#F5A55C",
   alertaSuave: "#342531",
+  /** Rojo del modo IA del Rubo (barra, falla de pantalla) y su fondo de cancha. */
+  peligro: "#FF5C6C",
+  peligroSuave: "#36182A",
   // Rampa secuencial de intensidad de lluvia (validada contra la superficie). En oscuro se invierte:
   // más claro = más fuerte.
   lluvia: { sin: "#33608C", ligera: "#4A8BCB", moderada: "#78B8F4", fuerte: "#BADDFF" },
@@ -49,6 +52,8 @@ const claro: typeof oscuro = {
   inactivo: "rgba(124, 58, 237, 0.6)",
   alerta: "#B54708",
   alertaSuave: "#F8EDE6",
+  peligro: "#C62839",
+  peligroSuave: "#FBE9EC",
   lluvia: { sin: "#86B6E6", ligera: "#4F93DA", moderada: "#2163B0", fuerte: "#0D3B70" },
 };
 

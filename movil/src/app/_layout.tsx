@@ -59,6 +59,13 @@ function Navegacion() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="noticias" options={{ title: "Noticias" }} />
         <Stack.Screen name="aire" options={{ title: "Calidad del aire" }} />
+        {/* Encabezado transparente: el fondo cuadriculado del Rubo llega hasta arriba de la pantalla. */}
+        <Stack.Screen name="pong" options={{
+            title: "Rubo",
+            gestureEnabled: false,
+            headerTransparent: true,
+            headerStyle: { backgroundColor: "transparent" },
+          }} />
       </Stack>
     </>
   );

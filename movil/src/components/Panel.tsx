@@ -10,12 +10,14 @@ import { espacio, radio, useColores } from "@/theme";
 interface Props {
   titulo?: string;
   children: ReactNode;
+  /** Fondo semitransparente, para que se vea lo que hay detrás (p. ej. la cuadrícula del Rubo). */
+  translucido?: boolean;
 }
 
-export function Panel({ titulo, children }: Props) {
+export function Panel({ titulo, children, translucido = false }: Props) {
   const c = useColores();
   return (
-    <View style={[styles.panel, { backgroundColor: c.superficie, borderColor: c.borde }]}>
+    <View style={[styles.panel, { backgroundColor: translucido ? `${c.superficie}99` : c.superficie, borderColor: c.borde }]}>
       {titulo ? <Text style={[styles.titulo, { color: c.enfasis }]}>{titulo}</Text> : null}
       {children}
     </View>
