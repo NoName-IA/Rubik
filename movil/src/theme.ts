@@ -69,6 +69,8 @@ export const fuente = {
   textoNegrita: "Inter_700Bold",
   /** Caracteres de la lluvia de código (font-extralight del portfolio). */
   codigo: "SpaceGrotesk_300Light",
+  /** Letra pixelada (8 bits) del cuadro de diálogo de Rubo. */
+  pixel: "PressStart2P_400Regular",
 } as const;
 
 /**

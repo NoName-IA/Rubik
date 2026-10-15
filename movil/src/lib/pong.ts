@@ -5,7 +5,30 @@
 export type Nivel = "normal" | "ia";
 export const NIVELES: readonly Nivel[] = ["normal", "ia"];
 
+/**
+ * Goles para ganar en normal (los dos). En la IA tú necesitas `GOLES_IA` (los 7 corazones de Rubo) y
+ * Rubo solo `CORAZONES_JUGADOR` (los tuyos).
+ */
 export const PUNTOS_PARA_GANAR = 3;
+export const GOLES_IA = 7;
+export const CORAZONES_JUGADOR = 3;
+/** Cuántos goles necesita cada uno para ganar. */
+export const metas = (nivel: Nivel) =>
+  nivel === "ia" ? { jugador: GOLES_IA, maquina: CORAZONES_JUGADOR } : { jugador: PUNTOS_PARA_GANAR, maquina: PUNTOS_PARA_GANAR };
+/**
+ * Con cuántos goles tuyos empieza cada fase de la IA: la 2 con el 2.º gol, la 3 con el 4.º y la 4 con
+ * el 6.º, cuando a Rubo le queda un solo corazón.
+ */
+export const GOLES_FASE_2 = 2;
+export const GOLES_FASE_3 = 4;
+export const GOLES_FASE_4 = GOLES_IA - 1;
+export type Fase = 1 | 2 | 3 | 4;
+/** Fase de Rubo según tus goles. En normal siempre es 1. */
+export function faseRubo(e: Pick<Estado, "nivel" | "puntos">): Fase {
+  if (e.nivel === "normal") return 1;
+  const g = e.puntos.jugador;
+  return g >= GOLES_FASE_4 ? 4 : g >= GOLES_FASE_3 ? 3 : g >= GOLES_FASE_2 ? 2 : 1;
+}
 export const BARRA_ANCHO = 0.42;
 export const BARRA_ALTO = 0.055;
 /** Distancia del centro de cada barra a su borde de la cancha. */
@@ -29,11 +52,12 @@ const PASO_MAXIMO = 1 / 240;
  * `reaccion`: solo va por la bola cuando esta ya recorrió esa fracción de la cancha hacia ella.
  * `prevee`: calcula los rebotes en las paredes (si no, solo persigue la bola).
  * `ataca`: en vez de equivocarse, pega con la punta de la barra para mandar la bola lejos de la tuya.
+ * `descuido`: con `ataca`, la probabilidad de que en un golpe no ataque y apunte con `error` (y falle).
  * `ritmo`: multiplica la velocidad del saque. `tope`: multiplica la velocidad máxima de la bola.
  * `aceleracion`: cuánto se acelera la bola por segundo mientras está en juego (anchos de cancha/s²).
  * `subidaSaque`: cuánto más rápido sale cada saque por cada punto ya jugado (0,08 = 8 %).
- * La IA no se equivoca nunca y llega a todas: no se le puede ganar. Su bola va cada vez más rápido.
- * Pero no empieza así: ver `perfil`.
+ * La IA (fase 3) llega a todas, casi siempre ataca y su bola va cada vez más rápido, pero de vez en
+ * cuando se descuida: es muy difícil, no imposible. No empieza así: ver `perfil`.
  */
 export interface Perfil {
   velocidad: number;
@@ -41,6 +65,7 @@ export interface Perfil {
   reaccion: number;
   prevee: boolean;
   ataca: boolean;
+  descuido: number;
   ritmo: number;
   tope: number;
   aceleracion: number;
@@ -54,6 +79,7 @@ export const MAQUINA: Record<Nivel, Perfil> = {
     reaccion: 0,
     prevee: true,
     ataca: false,
+    descuido: 0,
     ritmo: 1,
     tope: 1,
     aceleracion: 0,
@@ -61,20 +87,21 @@ export const MAQUINA: Record<Nivel, Perfil> = {
   },
   ia: {
     velocidad: 3,
-    error: 0,
+    error: 0.34,
     reaccion: 0,
     prevee: true,
     ataca: true,
+    descuido: 0.2,
     ritmo: 1.15,
     tope: 1.6,
     aceleracion: 0.08,
-    subidaSaque: 0.08,
+    subidaSaque: 0.04,
   },
 };
 
 /**
- * La IA después de tu primer gol: más rápida y con menos errores que el modo normal, pero todavía se
- * le puede hacer otro gol (falla de vez en cuando y no siempre alcanza la bola).
+ * La IA en la fase 2 (desde tu 2.º gol): más rápida y con menos errores que el modo normal, pero
+ * todavía se le hacen goles (falla de vez en cuando y no siempre alcanza la bola).
  */
 export const IA_PICADA: Perfil = {
   velocidad: 2,
@@ -82,22 +109,29 @@ export const IA_PICADA: Perfil = {
   reaccion: 0,
   prevee: true,
   ataca: false,
+  descuido: 0,
   ritmo: 1.08,
   tope: 1.25,
   aceleracion: 0.03,
-  subidaSaque: 0.04,
+  subidaSaque: 0.03,
 };
 
 /**
- * Cómo juega la máquina ahora. En normal, siempre igual. En la IA depende de tus goles: con 0 juega
- * como en normal, con 1 se pica (`IA_PICADA`) y con 2 se pone imposible (`MAQUINA.ia`).
+ * La IA en la fase 4 (le queda un corazón): igual que en la 3 pero sin descuidos ni errores. Llega a
+ * todas y siempre ataca lejos de tu barra: el último corazón no se puede romper.
+ */
+export const IA_INVENCIBLE: Perfil = { ...MAQUINA.ia, error: 0, descuido: 0 };
+
+/**
+ * Cómo juega la máquina ahora. En normal, siempre igual. En la IA depende de la fase (tus goles): en
+ * la 1 juega como en normal, en la 2 se pica (`IA_PICADA`), en la 3 se pone durísima (`MAQUINA.ia`) y
+ * en la 4 es invencible (`IA_INVENCIBLE`).
  */
 export function perfil(e: Pick<Estado, "nivel" | "puntos">): Perfil {
-  if (e.nivel === "normal") return MAQUINA.normal;
-  return e.puntos.jugador === 0 ? MAQUINA.normal : e.puntos.jugador === 1 ? IA_PICADA : MAQUINA.ia;
+  return [MAQUINA.normal, IA_PICADA, MAQUINA.ia, IA_INVENCIBLE][faseRubo(e) - 1];
 }
 
-/** Velocidad máxima de la bola en un nivel (en la IA, la del modo imposible). */
+/** Velocidad máxima de la bola en un nivel (en la IA, la de la fase 3). */
 export const velocidadTope = (nivel: Nivel) => VEL_MAXIMA * MAQUINA[nivel].tope;
 const topeDe = (e: Pick<Estado, "nivel" | "puntos">) => VEL_MAXIMA * perfil(e).tope;
 
@@ -160,8 +194,9 @@ export function cambiarAlto(e: Estado, alto: number): Estado {
 }
 
 export function ganador(e: Estado): "jugador" | "maquina" | null {
-  if (e.puntos.jugador >= PUNTOS_PARA_GANAR) return "jugador";
-  if (e.puntos.maquina >= PUNTOS_PARA_GANAR) return "maquina";
+  const meta = metas(e.nivel);
+  if (e.puntos.jugador >= meta.jugador) return "jugador";
+  if (e.puntos.maquina >= meta.maquina) return "maquina";
   return null;
 }
 
@@ -201,7 +236,7 @@ function rebotar(b: Bola, centroBarra: number, haciaAbajo: boolean, tope: number
  */
 function apuntar(m: Perfil, jugador: number, azar: Azar): number {
   // Pegar con la parte derecha de la barra (barra corrida a la izquierda) manda la bola a la derecha.
-  if (m.ataca) return (jugador < 0.5 ? -1 : 1) * mitad * 0.8;
+  if (m.ataca && azar() >= m.descuido) return (jugador < 0.5 ? -1 : 1) * mitad * 0.8;
   return (azar() * 2 - 1) * m.error;
 }
 

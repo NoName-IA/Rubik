@@ -24,7 +24,8 @@ Desde los accesos rápidos de Inicio se abren:
 
 - **Noticias** locales según la ubicación, sin repetidas. En el área de Barranquilla: El Heraldo y
   Zona Cero, todas con foto, con filtro Barranquilla/Atlántico. En otro lugar: Bing Noticias y Google
-  Noticias del municipio y del departamento (p. ej. Tocancipá/Cundinamarca).
+  Noticias del municipio y del departamento (p. ej. Tocancipá/Cundinamarca); a las que llegan sin
+  foto se les busca la de su artículo.
 - **Rubo**: Pong contra la máquina (ver más abajo).
 
 ### Ubicación
@@ -36,18 +37,32 @@ municipios cercanos (Soledad, Turbaco, Ciénaga, Soacha, Tocancipá, Bello, Flor
 ### Rubo
 
 Pong vertical: tu barra abajo (la mueves con el dedo), la de la máquina arriba. Gana quien llegue
-primero a **3**. Al terminar se ve el resultado y una rueda para jugar de nuevo.
+primero a **3** (en la IA, a **7**). Al terminar se ve el resultado y una rueda para jugar de nuevo.
 
 - **Normal**: la máquina falla de vez en cuando.
 - **IA**: empieza **encadenado**. Se desbloquea al ganar 2 veces en normal; entonces las cadenas
-  vibran y al tocarlas se rompen. La IA tiene tres fases según tus goles:
-  1. **0 goles**: juega como en normal.
-  2. **1 gol**: "¿Crees que puedes ganarme? -ja". Le dolió el golpe (su barra queda herida) y juega
-     mejor, pero todavía se le puede hacer otro gol.
-  3. **2 goles**: "¡¡Sal de aquí!!". Se pone imposible: no falla, ataca lejos de tu barra y la bola
-     se acelera. El fondo se tiñe de rojo y todo late con él.
+  vibran y al tocarlas se rompen. Rubo tiene **7 corazones** de 8 bits arriba de la cancha: cada gol
+  tuyo rompe uno (salta, tiembla, se parte y las mitades caen). Tiene cuatro fases según tus goles:
+  1. **0 y 1 gol**: juega como en normal.
+  2. **Desde el 2.º gol**: "¿Crees que puedes ganarme? -ja". Le dolió el golpe (su barra queda
+     herida) y juega mejor, pero todavía se le hacen goles.
+  3. **Desde el 4.º gol**: "¡¡Sal de aquí!!". Se pone durísimo: casi siempre ataca lejos de tu barra
+     y la bola se acelera, pero a veces se descuida. El fondo se tiñe de rojo y todo late con él.
+  4. **Con el 6.º gol** (le queda un corazón): "¿Así que así será?.." y, 2 segundos después,
+     "Bueno...". Se vuelve **invencible**: no falla nunca y el último corazón no se rompe.
 
-  Cada gol de la máquina hace fallar la pantalla (glitches), un poco más con cada uno.
+  Cada gol de la máquina hace fallar la pantalla (glitches), un poco más con cada uno hasta el
+  tercero.
+
+  **Música**: una canción para la fase 1, otra para las fases 2 y 3 (al pasar a la 3 sigue donde iba)
+  y otra para la 4. Cuando Rubo habla, la música se corta y aparece un cuadro de diálogo en 8 bits
+  (letra pixelada) que Rubo escribe letra por letra con su "voz": un bip por letra, callado en los
+  espacios y en los puntos suspensivos, que se escriben despacio (al menos 1 segundo de silencio).
+  Al terminar de escribir entra la canción de la fase nueva. Al terminar la partida se calla.
+- **Golpe**: en los dos modos, cada vez que la bola pega en una barra suena un bip 8-bit (agudo en la
+  tuya, grave en la de Rubo).
+- **Glitches**: cada ráfaga suena con estática digital entrecortada; fuerte con RuboKill y casi
+  inaudible sin él (sube un poco con cada gol, como la falla).
 - **RuboKill** (en Usuario, apagado por defecto; solo aparece con la IA desbloqueada): en la IA la
   bola va al doble de velocidad, los glitches son fuertes y, al perder, la pantalla se pone negra y
   aparece Rubo. No cambia el modo normal.
@@ -86,9 +101,14 @@ La app consulta todo directamente desde el celular: no necesita servidor propio 
   celular y se muestran con la hora de los datos mientras se reintenta.
 - **Noticias sin repetidas**: se unen las fuentes y se quitan las notas que cuentan lo mismo
   comparando las palabras de los titulares.
+- **Fotos de las noticias**: Google Noticias no trae foto y sus enlaces son redirecciones. La app le
+  pide a Google el enlace real del medio y lee la foto de portada del artículo (`og:image`); igual
+  con las de Bing que llegan sin foto. Se buscan de a 4 y se guardan en el celular. Al tocar la nota
+  se abre directo el medio.
 - **Rubo**: la física (rebotes, aceleración, cómo juega la máquina en cada nivel y fase) se simula
   en pasos cortos para que la bola nunca atraviese una barra; las pruebas juegan partidas completas
-  para comprobar que en normal la máquina falla y que a la IA nunca se le hace el tercer gol.
+  para comprobar que en normal la máquina falla y que a la IA se le meten 6 goles (en la fase 3
+  devuelve muchas más bolas que en normal) pero nunca el 7.º.
 
 Todo esto son funciones puras en `movil/src/lib/`, probadas con respuestas reales grabadas de cada
 fuente (`movil/tests/fixtures/`).
@@ -134,3 +154,7 @@ En resumen:
 - El software se entrega "tal cual", sin garantía.
 
 Este resumen es solo orientativo; el texto legal válido es el del archivo [`LICENSE`](LICENSE).
+
+Las canciones de `movil/assets/sonidos/fase-*.mp3` no son parte de este proyecto ni de su licencia:
+pertenecen a sus autores. La voz de Rubo, los golpes y la estática (`voz-*.wav`, `golpe-*.wav`, `glitch.wav`) sí son propios:
+los generan `movil/scripts/generar-voces.ts` y `movil/scripts/generar-sonidos.py`.

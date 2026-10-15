@@ -24,6 +24,8 @@ import { Panel } from "@/components/Panel";
 import { Segmentos } from "@/components/Segmentos";
 import { Text } from "@/components/Texto";
 import { usePreferencias } from "@/contexto/Preferencias";
+import { type MusicaRubo, useMusicaRubo } from "@/hooks/useMusicaRubo";
+import { FRASES_RUBO, letras, PAUSA_ENTRE_FRASES, tiempoHablando } from "@/lib/dialogo";
 import { useRecordado } from "@/hooks/useRecordado";
 import { CLAVE_VICTORIAS, leerVictorias, SIN_VICTORIAS, type Victorias, VICTORIAS_PARA_IA } from "@/hooks/useVictoriasRubo";
 import {
@@ -33,7 +35,13 @@ import {
   BOLA_RADIO,
   cambiarAlto,
   type Estado,
+  type Fase,
+  faseRubo,
   ganador,
+  GOLES_FASE_2,
+  GOLES_FASE_3,
+  CORAZONES_JUGADOR,
+  GOLES_IA,
   MARGEN,
   type Nivel,
   NIVELES,
@@ -113,6 +121,8 @@ function fallaSuave(gol: number) {
 }
 /** En el segundo gol de la IA las ráfagas van un poco más rápido. */
 const DURACION_FALLA_SEGUNDO_GOL = 230;
+/** Los glitches dejan de empeorar desde el tercer gol de la IA (4 ráfagas). */
+const NIVEL_FALLA_MAXIMO = 4;
 const CORTES_FALLA = 7;
 const CORTES_EXTRA_POR_PUNTO = 5;
 type Corte = { y: number; alto: number; dx: number; color: "peligro" | "enfasis" | "tinta" };
@@ -314,7 +324,10 @@ function Menu({
           Tú contra la máquina
         </Text>
         <Text style={[styles.textoMenu, { color: c.tinta2 }]}>
-          Desliza el dedo para mover tu barra. Gana el primero que llegue a {PUNTOS_PARA_GANAR}.
+          Desliza el dedo para mover tu barra.{" "}
+          {nivel === "ia"
+            ? `Rubo tiene ${GOLES_IA} corazones y tú ${CORAZONES_JUGADOR}: cada gol rompe uno.`
+            : `Gana el primero que llegue a ${PUNTOS_PARA_GANAR}.`}
         </Text>
       </Entrada>
       <Entrada retraso={PASO_ENTRADA}>
@@ -371,21 +384,19 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
   const dedo = useRef<number | null>(null);
   /** Hasta cuándo (Date.now) no se puede sacar, para alcanzar a leer lo que dice Rubo. */
   const saqueBloqueadoHasta = useRef(0);
-  /** Lo que dice Rubo ahora (modo IA, tras tu primer y tu segundo gol); se quita sola a los 2 s. */
-  const [frase, setFrase] = useState<string | null>(null);
+  /** Lo que dice Rubo ahora (modo IA, al empezar las fases 2 y 3); se quita sola al leerse. */
+  const [frase, setFrase] = useState<{ goles: number; frases: { texto: string; voz: number }[] } | null>(null);
   /** El fondo rojo de la fase 3 se está recogiendo tras tocar la rueda de reiniciar. */
   const [rojoSaliendo, setRojoSaliendo] = useState(false);
-  /** El cuadro de la frase está haciendo su animación de salida (al terminar se quita). */
-  const [fraseSaliendo, setFraseSaliendo] = useState(false);
   /**
-   * Tu segundo gol en la IA: Rubo se pone imposible y se nota en los mismos objetos. `golpe` (0 → 1 → 0)
+   * Tu 4.º gol en la IA (fase 3): Rubo se pone durísimo y se nota en los mismos objetos. `golpe` (0 → 1 → 0)
    * infla un momento su barra, la bola y la cancha; `furia` (0 ↔ 1, en bucle hasta el final) hace
    * latir el halo de su barra.
    */
   const [golpe] = useState(() => new Animated.Value(0));
   const [furia] = useState(() => new Animated.Value(0));
   /**
-   * Tu primer gol en la IA le duele a Rubo (sin decirlo): `dolor` (0 → 1 → 0) hace que su barra destelle
+   * Tu 2.º gol en la IA (fase 2) le duele a Rubo (sin decirlo): `dolor` (0 → 1 → 0) hace que su barra destelle
    * en blanco, se aplaste y salte hacia atrás; `temblor` (-1 a 1) la sacude, y mientras dure la fase 2
    * vuelve a temblar sola cada tanto, como herida.
    */
@@ -441,6 +452,20 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
   /** Pantalla en negro durante los glitches del último gol (con RuboKill), antes de que salga Rubo. */
   const [negro, setNegro] = useState(false);
 
+  // Sonido: en los dos modos, un golpe cuando la bola pega en una barra y un sonido de gol. En el modo IA,
+  // además, la estática de los glitches y la música: la fase 1 suena desde el saque inicial y al terminar
+  // la partida se calla; las fases 2 y 3 entran cuando Rubo termina de escribir (ver `Dialogo`).
+  const musica = useMusicaRubo();
+  const conMusica = nivel === "ia" && tam !== null;
+  useEffect(() => {
+    if (!conMusica) return;
+    musica.tocar(1, true);
+    return () => musica.parar();
+  }, [conMusica, ronda, musica]);
+  useEffect(() => {
+    if (fin) musica.parar();
+  }, [fin, musica]);
+
   // Ciclo del juego: un paso por cuadro de pantalla. Con la app en segundo plano no hay cuadros,
   // así que el juego se queda quieto hasta que vuelvas. Al terminar la partida sigue hasta que se
   // apagan las partículas del último gol.
@@ -456,13 +481,12 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
     // Modo IA: cuando anota la máquina, la cancha tiembla, parpadea y se corren unas franjas; con cada
     // punto que lleva (`nivel`) la falla se repite más veces y es más fuerte.
     let espera: ReturnType<typeof setTimeout> | undefined;
-    let quitarFrase: ReturnType<typeof setTimeout> | undefined;
     let latido: Animated.CompositeAnimation | undefined;
-    /** Tu segundo gol en la IA: la barra de Rubo, la bola y la cancha se inflan, y su halo empieza a latir. */
+    /** Tu 4.º gol en la IA (fase 3): la barra de Rubo, la bola y la cancha se inflan, y su halo empieza a latir. */
     let quejido: Animated.CompositeAnimation | undefined;
     const sacudir = (valores: number[], ms: number) =>
       Animated.sequence(valores.map((v) => Animated.timing(temblor, { toValue: v, duration: ms, useNativeDriver: NATIVO })));
-    /** Tu primer gol en la IA: el golpe le duele a Rubo y queda herido (tiembla solo de vez en cuando). */
+    /** Tu 2.º gol en la IA (fase 2): el golpe le duele a Rubo y queda herido (tiembla solo de vez en cuando). */
     const herir = () => {
       if (movimientoReducido()) return;
       dolor.setValue(0);
@@ -513,6 +537,8 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
             : Array.from({ length: CORTES_FALLA + CORTES_EXTRA_POR_PUNTO * (nivel - 1) }, () => crearCorte(alto, nivel)),
         );
         falla.setValue(0);
+        // Estática con cada ráfaga: fuerte con RuboKill; sin él, tan suave como la falla (y sube con cada gol).
+        musica.glitch(suave ? Math.min(0.5, 0.1 + 0.12 * (nivel - 1)) : 0.9);
         Animated.timing(falla, { toValue: 1, duration: duracion, easing: Easing.linear, useNativeDriver: NATIVO }).start(
           ({ finished }) => {
             if (!vigente) return;
@@ -545,22 +571,28 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       const antes = estadoRef.current;
       if (!antes) return;
       const s = avanzar(antes, dt, dedo.current);
+      // La bola solo invierte su dirección vertical al pegar en una barra (las paredes invierten la horizontal).
+      if (antes.fase === "jugando" && s.fase === "jugando" && Math.sign(s.bola.vy) !== Math.sign(antes.bola.vy)) {
+        musica.golpe(s.bola.vy < 0 ? "jugador" : "maquina");
+      }
       if (s.fase === "fin" && antes.fase !== "fin" && ganador(s) === "jugador") alGanar();
       if (antes.fase === "jugando" && s.fase !== "jugando") {
         particulas = explotar(antes.bola, antes.alto);
-        // Modo IA: con tu primer y tu segundo gol Rubo te habla; el saque espera un momento para leerlo.
+        // Modo IA: al empezar las fases 2 y 3 (tus goles 2 y 4) Rubo te habla. La música se corta, suena su voz mientras
+        // escribe y el saque espera a que termine de escribir.
         const dice = antes.nivel === "ia" && s.puntos.jugador > antes.puntos.jugador ? FRASES_RUBO[s.puntos.jugador] : undefined;
+        // (Los goles no tienen sonido propio: solo los glitches y la voz de Rubo.)
         if (dice) {
-          saqueBloqueadoHasta.current = Date.now() + ESPERA_FRASE;
-          setFrase(dice);
-          clearTimeout(quitarFrase);
-          setFraseSaliendo(false);
-          quitarFrase = setTimeout(() => setFraseSaliendo(true), DURACION_FRASE);
-          if (s.puntos.jugador === 1) herir();
-          if (s.puntos.jugador === 2) enfurecer();
+          saqueBloqueadoHasta.current = Date.now() + tiempoHablando(dice) + ESPERA_FRASE;
+          setFrase({ goles: s.puntos.jugador, frases: dice });
+          if (s.puntos.jugador === GOLES_FASE_2) herir();
+          if (s.puntos.jugador === GOLES_FASE_3) enfurecer();
         }
-        // Un nivel por encima del marcador: el primer punto ya trae 2 ráfagas, el segundo 3, el tercero 4.
-        if (antes.nivel === "ia" && s.puntos.maquina > antes.puntos.maquina) fallar(s.puntos.maquina + 1, ganador(s) === "maquina");
+        // Un nivel por encima del marcador: el primer punto ya trae 2 ráfagas, el segundo 3, y del tercero
+        // en adelante 4 (la partida llega a 7 y más serían eternas).
+        if (antes.nivel === "ia" && s.puntos.maquina > antes.puntos.maquina) {
+          fallar(Math.min(s.puntos.maquina + 1, NIVEL_FALLA_MAXIMO), ganador(s) === "maquina");
+        }
       }
       particulas = moverParticulas(particulas, dt);
       esperando = s.fase === "saque" ? esperando + dt : 0;
@@ -577,7 +609,6 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
     return () => {
       vigente = false;
       clearTimeout(espera);
-      clearTimeout(quitarFrase);
       setFrase(null);
       latido?.stop();
       quejido?.stop();
@@ -623,10 +654,10 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
 
   // Modo IA: cancha con tono rojo y la barra de la máquina en rojo con brillo.
   const ia = nivel === "ia";
-  // Fase 3 (ya le metiste 2 goles): manda Rubo. Todo se tiñe de rojo y late con él: el borde, las
+  // Fases 3 y 4 (desde tu 4.º gol): manda Rubo. Todo se tiñe de rojo y late con él: el borde, las
   // líneas, su marcador, un rojo que respira sobre la cancha y una viñeta roja en toda la pantalla; tu
   // barra se apaga un poco.
-  const fase3 = ia && (estado?.puntos.jugador ?? 0) >= 2;
+  const fase3 = ia && estado !== null && faseRubo(estado) >= 3;
   const colores = {
     fondo: ia ? c.peligroSuave : c.superficie,
     borde: fase3 ? c.peligro : ia ? `${c.peligro}66` : c.borde,
@@ -636,7 +667,9 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
 
   // Tamaño de la cancha: 1,85 veces más alta que ancha, lo más grande que quepa dejando libre la
   // zona de abajo; si no cabe a todo el ancho, se angosta y queda centrada.
-  const relleno = { arriba: altoEncabezado + espacio.m, abajo: insets.bottom };
+  // En la IA, arriba de la cancha va la fila de corazones de Rubo.
+  const filaCorazones = ia ? ALTO_CORAZON + espacio.m : 0;
+  const relleno = { arriba: altoEncabezado + espacio.m + filaCorazones, abajo: insets.bottom };
   const altoDisponible = area ? area.alto - relleno.arriba - relleno.abajo - ZONA_DEDO_MINIMA : 0;
   const anchoCancha = area ? Math.max(0, Math.min(area.ancho - 2 * espacio.l, altoDisponible / PROPORCION_CANCHA)) : 0;
   const altoCancha = anchoCancha * PROPORCION_CANCHA;
@@ -687,6 +720,26 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
           saliendo={!fase3 && rojoSaliendo}
           alSalir={() => setRojoSaliendo(false)}
         />
+      ) : null}
+
+      {/* Modo IA: arriba los 7 corazones de Rubo (negros cuando el fondo se pone rojo) y abajo tus 3. */}
+      {ia && estado ? (
+        <>
+          <Corazones
+            quien="Rubo"
+            total={GOLES_IA}
+            rotos={estado.puntos.jugador}
+            color={fase3 ? "#000000" : c.peligro}
+            posicion={{ top: altoEncabezado + espacio.s }}
+          />
+          <Corazones
+            quien="Tú"
+            total={CORAZONES_JUGADOR}
+            rotos={estado.puntos.maquina}
+            color={c.enfasis}
+            posicion={{ bottom: relleno.abajo + espacio.m }}
+          />
+        </>
       ) : null}
 
       {area ? (
@@ -769,13 +822,14 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
               </>
             ) : null}
 
-            {/* Modo IA: después de tu primer y tu segundo gol, Rubo te dice algo durante 2 segundos. */}
+            {/* Modo IA: al empezar las fases 2, 3 y 4, Rubo te escribe algo. */}
             {tam && frase ? (
               <Dialogo
-                key={frase}
-                texto={frase}
+                key={frase.goles}
+                frases={frase.frases}
                 arriba={(MARGEN + BARRA_ALTO) * tam.ancho + espacio.l}
-                saliendo={fraseSaliendo}
+                musica={musica}
+                fase={estado ? faseRubo(estado) : 1}
                 alSalir={() => setFrase(null)}
               />
             ) : null}
@@ -1157,7 +1211,7 @@ const Barra = memo(function Barra({
   brillo?: boolean;
   golpe?: Animated.Value;
   furia?: Animated.Value;
-  /** 0 → 1 → 0 al recibir tu primer gol: destella en blanco, se aplasta y salta hacia atrás. */
+  /** 0 → 1 → 0 al empezar la fase 2: destella en blanco, se aplasta y salta hacia atrás. */
   dolor?: Animated.Value;
   /** -1 a 1: la sacude de lado a lado. */
   temblor?: Animated.Value;
@@ -1370,58 +1424,194 @@ const LineaMedio = memo(function LineaMedio({ ancho, alto, color }: { ancho: num
   );
 });
 
-/**
- * Lo que dice Rubo en el modo IA según tus goles: con el primero se pica (y juega mejor), con el
- * segundo se enoja (y se pone imposible). Ver `perfil` en lib/pong.ts.
- */
-const FRASES_RUBO: Record<number, string> = {
-  1: "¿Crees que puedes ganarme? -ja",
-  2: "¡¡Sal de aquí!!",
-};
-/** Cuánto espera el saque después de esos goles, para alcanzar a leer (ms). */
-const ESPERA_FRASE = 900;
-/** Cuánto se queda el cuadro de diálogo (ms). */
-const DURACION_FRASE = 2000;
+/** Corazón de 8 bits: 7 × 6 píxeles. */
+const PIXELES_CORAZON = [".XX.XX.", "XXXXXXX", "XXXXXXX", ".XXXXX.", "..XXX..", "...X..."];
+/** Por dónde se parte (columna de cada fila): una grieta en zigzag. */
+const GRIETA = [4, 3, 4, 3, 3, 4];
+const PIXEL = 4;
+const ANCHO_CORAZON = PIXEL * 7;
+const ALTO_CORAZON = PIXEL * 6;
+const DURACION_ROTURA = 650;
+
+/** Los píxeles de un corazón: entero, o solo la mitad izquierda o derecha de la grieta. */
+function PixelesCorazon({ color, mitad }: { color: string; mitad?: "izquierda" | "derecha" }) {
+  return (
+    <Svg width={ANCHO_CORAZON} height={ALTO_CORAZON}>
+      {PIXELES_CORAZON.flatMap((fila, y) =>
+        [...fila].map((p, x) =>
+          p === "X" && (!mitad || (mitad === "izquierda") === x < GRIETA[y]) ? (
+            <Rect key={`${x}-${y}`} x={x * PIXEL} y={y * PIXEL} width={PIXEL} height={PIXEL} fill={color} />
+          ) : null,
+        ),
+      )}
+    </Svg>
+  );
+}
 
 /**
- * Cuadro de diálogo de Rubo, brutalista como el final: bloque rojo, borde grueso y sombra dura. Entra
- * subiendo; con `saliendo` se va hacia arriba, achicándose y desvaneciéndose, y luego avisa con `alSalir`.
+ * Un corazón de Rubo. Al romperse (`roto`) da un salto, tiembla, se parte por la grieta y las dos
+ * mitades caen girando y se desvanecen; queda su hueco apagado. Al reiniciar vuelve entero.
+ */
+const Corazon = memo(function Corazon({ roto, color }: { roto: boolean; color: string }) {
+  const c = useColores();
+  const [rotura] = useState(() => new Animated.Value(roto ? 1 : 0));
+
+  useEffect(() => {
+    if (!roto || movimientoReducido()) {
+      rotura.setValue(roto ? 1 : 0);
+      return;
+    }
+    rotura.setValue(0);
+    const animacion = Animated.timing(rotura, { toValue: 1, duration: DURACION_ROTURA, easing: Easing.linear, useNativeDriver: NATIVO });
+    animacion.start();
+    return () => animacion.stop();
+  }, [roto, rotura]);
+
+  // Primer 20 %: salto y temblor con el corazón entero. Después se separan las mitades.
+  const mitad = (lado: -1 | 1) => ({
+    position: "absolute" as const,
+    opacity: rotura.interpolate({ inputRange: [0, 0.2, 0.55, 1], outputRange: [1, 1, 1, 0] }),
+    transform: [
+      {
+        translateX: rotura.interpolate({
+          inputRange: [0, 0.05, 0.1, 0.15, 0.2, 1],
+          outputRange: [0, 2, -2, 1, 0, 9 * lado],
+        }),
+      },
+      {
+        translateY: rotura.interpolate({
+          // Cae acelerando (sin `easing`: el driver nativo no lo admite en interpolate).
+          inputRange: [0, 0.08, 0.2, 0.6, 1],
+          outputRange: [0, -6, 0, 6, 22],
+        }),
+      },
+      { rotate: rotura.interpolate({ inputRange: [0, 0.2, 1], outputRange: ["0deg", "0deg", `${40 * lado}deg`] }) },
+    ],
+  });
+
+  return (
+    <View style={{ width: ANCHO_CORAZON, height: ALTO_CORAZON }}>
+      {/* El hueco que queda (se ve solo cuando ya se cayeron las mitades). */}
+      <View style={{ position: "absolute" }}>
+        <PixelesCorazon color={`${c.tinta}26`} />
+      </View>
+      <Animated.View style={mitad(-1)}>
+        <PixelesCorazon color={color} mitad="izquierda" />
+      </Animated.View>
+      <Animated.View style={mitad(1)}>
+        <PixelesCorazon color={color} mitad="derecha" />
+      </Animated.View>
+    </View>
+  );
+});
+
+/** Vidas en el modo IA: una fila de corazones; cada gol del otro rompe uno, de derecha a izquierda. */
+function Corazones({
+  quien,
+  total,
+  rotos,
+  color,
+  posicion,
+}: {
+  quien: string;
+  total: number;
+  rotos: number;
+  color: string;
+  posicion: { top: number } | { bottom: number };
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.corazones, posicion]}
+      accessible
+      accessibilityLabel={`${quien}: ${Math.max(0, total - rotos)} de ${total} corazones`}
+    >
+      {Array.from({ length: total }, (_, i) => (
+        <Corazon key={i} roto={i >= total - rotos} color={color} />
+      ))}
+    </View>
+  );
+}
+
+/** Cuánto se queda el cuadro después de la última frase, para leerla (ms). */
+const DURACION_FRASE = 1500;
+/** Cuánto espera el saque después de que Rubo termina de hablar (ms). */
+const ESPERA_FRASE = 400;
+
+/**
+ * Cuadro de diálogo de Rubo en 8 bits: caja negra con borde blanco y letra pixelada. Rubo escribe cada
+ * frase letra por letra con su voz (la música se corta; los puntos suspensivos van lentos y en
+ * silencio). Si son varias, cada una se queda `PAUSA_ENTRE_FRASES` y la siguiente la reemplaza en la
+ * misma caja. Al terminar la última entra la canción de la fase nueva (`fase`), el cuadro se queda un
+ * momento y se va hacia arriba, achicándose, y luego avisa con `alSalir`.
  */
 function Dialogo({
-  texto,
+  frases,
   arriba,
-  saliendo,
+  musica,
+  fase,
   alSalir,
 }: {
-  texto: string;
+  frases: { texto: string; voz: number }[];
   arriba: number;
-  saliendo: boolean;
+  musica: MusicaRubo;
+  fase: Fase;
   alSalir: () => void;
 }) {
-  const c = useColores();
+  const [partes] = useState(() => frases.map((f) => letras(f.texto)));
+  const reducido = movimientoReducido();
+  const [actual, setActual] = useState(reducido ? partes.length - 1 : 0);
+  const [escritas, setEscritas] = useState(reducido ? partes[partes.length - 1].length : 0);
   const [salida] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    if (!saliendo) return;
-    if (movimientoReducido()) {
-      alSalir();
-      return;
-    }
-    const animacion = Animated.timing(salida, {
-      toValue: 1,
-      duration: 260,
-      easing: Easing.in(Easing.back(2)),
-      useNativeDriver: NATIVO,
-    });
-    animacion.start(({ finished }) => finished && alSalir());
-    return () => animacion.stop();
-    // `alSalir` cambia en cada render de la pantalla; solo importa cuándo empieza a salir.
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    let animacion: Animated.CompositeAnimation | undefined;
+    const salir = () => {
+      musica.tocar(fase);
+      espera = setTimeout(() => {
+        if (reducido) return alSalir();
+        animacion = Animated.timing(salida, {
+          toValue: 1,
+          duration: 260,
+          easing: Easing.in(Easing.back(2)),
+          useNativeDriver: NATIVO,
+        });
+        animacion.start(({ finished }) => finished && alSalir());
+      }, DURACION_FRASE);
+    };
+    // Escribe la frase `f` letra por letra (cada una con su tiempo: ver `letras` en lib/dialogo.ts).
+    const escribir = (f: number) => {
+      setActual(f);
+      setEscritas(0);
+      musica.hablar(frases[f].voz);
+      const siguiente = (n: number) => {
+        espera = setTimeout(() => {
+          setEscritas(n + 1);
+          if (n + 1 < partes[f].length) siguiente(n + 1);
+          else if (f + 1 < partes.length) espera = setTimeout(() => escribir(f + 1), PAUSA_ENTRE_FRASES);
+          else salir();
+        }, partes[f][n].ms);
+      };
+      siguiente(0);
+    };
+    if (reducido) salir();
+    else escribir(0);
+    return () => {
+      clearTimeout(espera);
+      animacion?.stop();
+    };
+    // Cada vez que Rubo habla se monta un cuadro nuevo (con su `key`): esto corre una sola vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saliendo, salida]);
+  }, []);
 
+  const texto = partes[actual].map((l) => l.letra);
+  // La caja toma el tamaño de la frase más larga desde el principio, para no cambiar al escribir.
+  const larga = frases.reduce((a, f) => (f.texto.length > a.length ? f.texto : a), "");
   return (
     <Animated.View
       pointerEvents="none"
+      accessibilityLabel={`Rubo: ${frases.map((f) => f.texto).join(" ")}`}
       style={[
         styles.dialogo,
         {
@@ -1434,15 +1624,13 @@ function Dialogo({
         },
       ]}
     >
-      <Entrada>
-        <View>
-          <View style={[styles.sombraDura, { backgroundColor: c.tinta }]} />
-          <View style={[styles.bloqueDialogo, { backgroundColor: c.peligro, borderColor: c.tinta }]}>
-            <Text style={[styles.quienHabla, { color: c.sobreEnfasis }]}>RUBO</Text>
-            <Text style={[styles.textoDialogo, { color: c.sobreEnfasis }]}>{texto}</Text>
-          </View>
-        </View>
-      </Entrada>
+      <View style={styles.bloqueDialogo}>
+        <Text style={[styles.textoDialogo, { color: "transparent" }]}>{`* ${larga}`}</Text>
+        <Text style={[styles.textoDialogo, styles.textoEscrito]}>
+          {"* "}
+          {texto.slice(0, escritas).join("")}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
@@ -1555,6 +1743,7 @@ const styles = StyleSheet.create({
   menuBotones: { paddingHorizontal: espacio.l },
   juego: { flex: 1, paddingHorizontal: espacio.l },
   contenedorCancha: { alignSelf: "center" },
+  corazones: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   corte: { position: "absolute", left: 0, right: 0 },
   // RuboKill: fondo casi negro con un tinte rojo, la foto lo más grande que quepa.
   rubokill: {
@@ -1589,10 +1778,11 @@ const styles = StyleSheet.create({
   final: { alignItems: "center", gap: espacio.xl },
   anuncio: { alignItems: "flex-start" },
   bloque: { borderWidth: 3, paddingHorizontal: espacio.l, paddingVertical: espacio.s },
-  dialogo: { position: "absolute", left: espacio.l, right: espacio.l + 7 },
-  bloqueDialogo: { borderWidth: 3, paddingHorizontal: espacio.m, paddingVertical: espacio.s, gap: 2 },
-  quienHabla: { fontSize: 11, fontWeight: "800", letterSpacing: 2, opacity: 0.8 },
-  textoDialogo: { fontSize: 20, fontFamily: fuente.titulo, lineHeight: 25 },
+  dialogo: { position: "absolute", left: espacio.l, right: espacio.l },
+  // Caja de 8 bits: negra, borde blanco grueso y esquinas rectas (igual en modo claro y oscuro).
+  bloqueDialogo: { backgroundColor: "#000000", borderColor: "#FFFFFF", borderWidth: 4, padding: espacio.m },
+  textoDialogo: { color: "#FFFFFF", fontSize: 13, fontFamily: fuente.pixel, lineHeight: 22 },
+  textoEscrito: { position: "absolute", top: espacio.m, left: espacio.m, right: espacio.m },
   sombraDura: { position: "absolute", left: 7, top: 7, right: -7, bottom: -7 },
   tituloFinal: { fontSize: 44, fontFamily: fuente.titulo, lineHeight: 50, letterSpacing: -1.5 },
   // El marcador cuelga pegado debajo del bloque, como una etiqueta.

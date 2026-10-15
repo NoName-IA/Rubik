@@ -1,6 +1,7 @@
 // Raíz: proveedores de datos y ubicación, bienvenida del primer arranque, y la navegación
 // (navbar + pantallas que se abren desde los accesos rápidos).
 
+import { PressStart2P_400Regular } from "@expo-google-fonts/press-start-2p";
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from "@expo-google-fonts/inter";
 import { SpaceGrotesk_300Light, SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk";
 import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -38,6 +39,7 @@ function Navegacion() {
     SpaceGrotesk_300Light,
     SpaceGrotesk_500Medium,
     SpaceGrotesk_700Bold,
+    PressStart2P_400Regular,
   });
 
   // Si las fuentes fallan se sigue con las del sistema (no se bloquea la app).

@@ -25,11 +25,26 @@ export async function obtenerTexto(url: string, tiempoMaximoMs = 15_000): Promis
   return pedir(url, tiempoMaximoMs, "application/rss+xml, application/xml, text/xml, */*", (resp) => resp.text());
 }
 
-async function pedir<T>(url: string, tiempoMaximoMs: number, accept: string, leer: (r: Response) => Promise<T>): Promise<T> {
+/** Texto de una página web o de un POST de formulario (para sacar la foto de una noticia). */
+export async function obtenerPagina(url: string, formulario?: string, tiempoMaximoMs = 10_000): Promise<string> {
+  const extra: RequestInit = formulario
+    ? { method: "POST", body: formulario, headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" } }
+    : {};
+  return pedir(url, tiempoMaximoMs, "text/html, */*", (resp) => resp.text(), extra);
+}
+
+async function pedir<T>(
+  url: string,
+  tiempoMaximoMs: number,
+  accept: string,
+  leer: (r: Response) => Promise<T>,
+  extra: RequestInit = {},
+): Promise<T> {
   const control = new AbortController();
   const temporizador = setTimeout(() => control.abort(), tiempoMaximoMs);
   try {
-    const resp = await fetch(url, { signal: control.signal, headers: { Accept: accept } });
+    const headers = { Accept: accept, ...(extra.headers as Record<string, string> | undefined) };
+    const resp = await fetch(url, { ...extra, signal: control.signal, headers });
     if (!resp.ok) throw new ErrorRed(`El servicio respondió con error ${resp.status}`, resp.status);
     return await leer(resp);
   } catch (err) {

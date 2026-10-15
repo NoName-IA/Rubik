@@ -10,7 +10,11 @@ import {
   caraJugador,
   caraMaquina,
   type Estado,
+  CORAZONES_JUGADOR,
+  faseRubo,
   ganador,
+  GOLES_IA,
+  IA_INVENCIBLE,
   IA_PICADA,
   MAQUINA,
   type Nivel,
@@ -41,8 +45,8 @@ function azarFijo(semilla: number) {
 
 const jugando = (e: Estado, bola: Partial<Estado["bola"]>): Estado => ({ ...e, fase: "jugando", bola: { ...e.bola, ...bola } });
 const rapidez = (e: Estado) => Math.hypot(e.bola.vx, e.bola.vy);
-/** La IA ya imposible: con 2 goles tuyos (ver `perfil`). */
-const iaImposible = (maquina = 0): Estado => ({ ...nuevoJuego(ALTO, "ia"), puntos: { jugador: 2, maquina } });
+/** La IA en la fase 3: con 4 goles tuyos (ver `perfil`). */
+const iaImposible = (maquina = 0): Estado => ({ ...nuevoJuego(ALTO, "ia"), puntos: { jugador: 4, maquina } });
 
 test("la bola espera en el centro hasta el toque, y saca hacia el jugador", () => {
   let e = nuevoJuego(ALTO, "normal");
@@ -178,27 +182,71 @@ test("partidas simuladas: en normal la máquina falla de vez en cuando", () => {
   assert.ok(normal > 10 && normal < 30, `normal devuelve unas cuantas: ${normal}`);
 });
 
-test("la IA juega como en normal, se pica con tu primer gol y se pone imposible con el segundo", () => {
-  const sin = { nivel: "ia" as const, puntos: { jugador: 0, maquina: 2 } };
-  assert.equal(perfil(sin), MAQUINA.normal);
-  assert.equal(perfil({ ...sin, puntos: { jugador: 1, maquina: 0 } }), IA_PICADA);
-  assert.equal(perfil({ ...sin, puntos: { jugador: 2, maquina: 1 } }), MAQUINA.ia);
+test("fases de la IA: la 2 con tu 2.º gol, la 3 con el 4.º y la 4 con el 6.º; en normal no cambia", () => {
+  const con = (jugador: number) => ({ nivel: "ia" as const, puntos: { jugador, maquina: 2 } });
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6].map((g) => faseRubo(con(g))), [1, 1, 2, 2, 3, 3, 4]);
+  assert.equal(perfil(con(1)), MAQUINA.normal);
+  assert.equal(perfil(con(3)), IA_PICADA);
+  assert.equal(perfil(con(5)), MAQUINA.ia);
+  assert.equal(perfil(con(6)), IA_INVENCIBLE);
   assert.equal(perfil({ nivel: "normal", puntos: { jugador: 2, maquina: 0 } }), MAQUINA.normal);
+  assert.equal(faseRubo({ nivel: "normal", puntos: { jugador: 2, maquina: 0 } }), 1);
 });
 
-test("partidas simuladas: a la IA se le hacen 2 goles, nunca el tercero", () => {
+test("en la IA se gana a los 7 goles (en normal, a los 3)", () => {
+  const casi = (nivel: Nivel, jugador: number) => ({
+    ...jugando({ ...nuevoJuego(ALTO, nivel), puntos: { jugador, maquina: 0 } }, { x: 0.05, y: 0.01, vx: 0, vy: -1 }),
+    maquina: 0.9,
+  });
+  assert.equal(avanzar(casi("ia", PUNTOS_PARA_GANAR - 1), 0.05, null).fase, "saque", "a la IA no le bastan 3");
+  const fin = avanzar(casi("ia", GOLES_IA - 1), 0.05, null);
+  assert.equal(fin.fase, "fin");
+  assert.equal(ganador(fin), "jugador");
+  assert.equal(avanzar(casi("normal", PUNTOS_PARA_GANAR - 1), 0.05, null).fase, "fin");
+});
+
+test("en la IA tienes 3 corazones: Rubo te gana con 3 goles", () => {
+  // La bola sale por abajo (gol de Rubo) con tu barra lejos.
+  const golDeRubo = (maquina: number) => ({
+    ...jugando({ ...nuevoJuego(ALTO, "ia"), puntos: { jugador: 5, maquina } }, { x: 0.05, y: ALTO - 0.01, vx: 0, vy: 1 }),
+    jugador: 0.9,
+  });
+  assert.equal(avanzar(golDeRubo(CORAZONES_JUGADOR - 2), 0.05, null).fase, "saque");
+  const fin = avanzar(golDeRubo(CORAZONES_JUGADOR - 1), 0.05, null);
+  assert.equal(fin.fase, "fin");
+  assert.equal(ganador(fin), "maquina");
+});
+
+test("partidas simuladas: a la IA se le meten 6 goles (en la fase 3 cuesta mucho más que en normal), nunca el 7.º", () => {
+  let golpesFase3 = 0;
+  let golesFase3 = 0;
   for (let partida = 0; partida < 10; partida++) {
-    const { e } = jugarPartida("ia", partida, 60 * 60 * 20);
-    // El jugador simulado devuelve casi todo, así que la máquina tampoco llega a ganar: lo que importa
-    // es que pasa de 0 a 2 y de ahí no sube.
-    assert.equal(e.puntos.jugador, 2, `partida ${partida}: ${JSON.stringify(e.puntos)}`);
+    const azar = azarFijo(partida + 1);
+    const azarJugador = azarFijo(partida + 100);
+    let e = nuevoJuego(ALTO, "ia");
+    let subia = false;
+    let corrimiento = 0;
+    for (let i = 0; i < 60 * 60 * 20 && e.fase !== "fin"; i++) {
+      if (e.bola.vy < 0) corrimiento = (azarJugador() * 2 - 1) * 0.17;
+      if (e.fase === "saque") e = sacarYa(e, azar);
+      const fase3 = faseRubo(e) === 3;
+      const antes = e.puntos.jugador;
+      e = avanzar(e, DT, e.bola.x - corrimiento, azar);
+      if (fase3 && e.puntos.jugador > antes) golesFase3++;
+      if (fase3 && subia && e.fase === "jugando" && e.bola.vy > 0) golpesFase3++;
+      subia = e.fase === "jugando" && e.bola.vy < 0;
+    }
+    // El jugador perfecto llega al último corazón y ahí se queda: la fase 4 no se deja.
+    assert.equal(e.puntos.jugador, GOLES_IA - 1, `partida ${partida}: ${JSON.stringify(e.puntos)}`);
   }
+  const porGol = golpesFase3 / golesFase3;
+  assert.ok(porGol > golpesPorPunto("normal"), `en la fase 3 devuelve más que en normal: ${porGol}`);
 });
 
-test("en el modo IA imposible la bola va un 15 % más rápida", () => {
-  const normal = sacarYa({ ...nuevoJuego(ALTO, "normal"), puntos: { jugador: 2, maquina: 0 } }, () => 0.5);
+test("en la fase 3 de la IA la bola va un 15 % más rápida", () => {
+  const normal = sacarYa({ ...nuevoJuego(ALTO, "normal"), puntos: { jugador: 4, maquina: 0 } }, () => 0.5);
   const ia = sacarYa(iaImposible(), () => 0.5);
-  // 15 % más, y cada saque un 8 % más por punto jugado (aquí van 2).
+  // 15 % más, y cada saque un 4 % más por punto jugado (aquí van 4).
   assert.ok(Math.abs(rapidez(ia) / rapidez(normal) - 1.15 * 1.16) < 1e-9);
   const cj = caraJugador(ALTO);
   const rapida = jugando(iaImposible(), { x: 0.5, y: cj - BOLA_RADIO - 0.001, vx: 0, vy: VEL_MAXIMA * 1.7 });
@@ -209,7 +257,7 @@ test("en el modo IA imposible la bola va un 15 % más rápida", () => {
 test("en el modo IA la bola se acelera mientras está en juego; en normal no", () => {
   // Bola en el centro yendo de lado a lado (rebota en las paredes, nunca llega a una barra).
   const de = (nivel: Nivel) =>
-    jugando({ ...nuevoJuego(ALTO, nivel), puntos: { jugador: 2, maquina: 0 } }, { x: 0.5, y: ALTO / 2, vx: 1, vy: 0 });
+    jugando({ ...nuevoJuego(ALTO, nivel), puntos: { jugador: 4, maquina: 0 } }, { x: 0.5, y: ALTO / 2, vx: 1, vy: 0 });
   let ia = de("ia");
   let normal = de("normal");
   for (let i = 0; i < 300; i++) {

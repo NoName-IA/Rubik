@@ -44,7 +44,16 @@
           "imageWidth": 200,
           "backgroundColor": "#000000"
         }
-      ]
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset"
     ],
     "scheme": "barranquillahoy",
     "extra": {

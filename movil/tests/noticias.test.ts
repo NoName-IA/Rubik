@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import { antiguedad, combinar, CUPO_MINIMO_GOOGLE, palabras, similitud } from "../src/lib/noticias/combinar.ts";
 import { deBing, decodificar, deElHeraldo, deGoogle, deZonaCero, esDeBarranquilla, leerRss, type Noticia, URLS } from "../src/lib/noticias/fuentes.ts";
+import { buscarFoto, fotoDeHtml, limitador } from "../src/lib/noticias/foto.ts";
 import { zonasNoticias } from "../src/lib/noticias/lugar.ts";
 
 const leer = (n: string) => readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf-8");
@@ -254,4 +255,53 @@ test("fuera de Barranquilla solo se buscan Google y Bing", async () => {
   assert.ok(pedidas.some((u) => u.startsWith("https://www.bing.com/news/search?q=%22Tocanc")));
   assert.ok(pedidas.some((u) => u.startsWith("https://news.google.com/rss/search?q=%22Tocanc")));
   assert.deepEqual(r.caidas, []);
+});
+
+test("foto de la página: og:image con &amp;, relativa o de twitter", () => {
+  const base = "https://www.medio.co/nota/1";
+  assert.equal(
+    fotoDeHtml(`<head><meta content="https://img.medio.co/a.jpg?w=1&amp;h=2" property="og:image"></head>`, base),
+    "https://img.medio.co/a.jpg?w=1&h=2",
+  );
+  assert.equal(fotoDeHtml(`<meta property='og:image' content='/fotos/b.jpg'>`, base), "https://www.medio.co/fotos/b.jpg");
+  assert.equal(fotoDeHtml(`<meta name="twitter:image" content="http://img.medio.co/c.png">`, base), "https://img.medio.co/c.png");
+  assert.equal(fotoDeHtml(`<head><title>x</title></head><body><meta property="og:image" content="/no.jpg"></body>`, base), null);
+});
+
+test("foto de Google Noticias: pide el enlace real y lee su foto", async () => {
+  const pedidos: string[] = [];
+  const pagina = async (url: string, formulario?: string) => {
+    pedidos.push(url);
+    if (url.startsWith("https://news.google.com/articles/")) return `<c-wiz data-n-a-sg="FIRMA" data-n-a-ts="1760000000">`;
+    if (formulario) {
+      assert.ok(/ABC123.*1760000000.*FIRMA/.test(decodeURIComponent(formulario)), "lleva el id, la hora y la firma");
+      return `)]}'\n[["wrb.fr","Fbv4je","[\\"garturlres\\",\\"https://www.medio.co/nota\\",1]",null]]`;
+    }
+    return `<meta property="og:image" content="https://www.medio.co/foto.jpg">`;
+  };
+  const google = n("Una nota", "google", "Medio", 5);
+  const foto = await buscarFoto({ ...google, url: "https://news.google.com/rss/articles/ABC123?oc=5" }, pagina);
+  assert.deepEqual(foto, { imagen: "https://www.medio.co/foto.jpg", url: "https://www.medio.co/nota" });
+  assert.equal(pedidos.length, 3);
+  // Si la página falla, la noticia sigue, sin foto.
+  assert.deepEqual(await buscarFoto(n("Otra", "bing", "Medio", 5), async () => Promise.reject(new Error("x"))), {
+    imagen: null,
+    url: n("Otra", "bing", "Medio", 5).url,
+  });
+});
+
+test("limitador: nunca más de N tareas a la vez", async () => {
+  const turno = limitador(2);
+  let activas = 0;
+  let pico = 0;
+  await Promise.all(
+    Array.from({ length: 6 }, () =>
+      turno(async () => {
+        pico = Math.max(pico, ++activas);
+        await new Promise((r) => setTimeout(r, 5));
+        activas--;
+      }),
+    ),
+  );
+  assert.equal(pico, 2);
 });

@@ -19,8 +19,9 @@ variante de Inter según el grosor.
   (`Presionable`). Con "reducir movimiento" del sistema no hay animaciones.
 - **Recuerda lo elegido** en cada pantalla (vista de Clima, filtro de Noticias, período y conversor
   del Dólar, nivel del Rubo) con `src/hooks/useRecordado.ts`, aunque se cierre la app.
-- **Rubo** tiene su propio estilo: menú con fondo cuadriculado, cancha roja en el modo IA y
-  resultado y diálogos brutalistas (bloque de color, borde grueso, sombra dura).
+- **Rubo** tiene su propio estilo: menú con fondo cuadriculado, cancha roja en el modo IA, resultado
+  brutalista (bloque de color, borde grueso, sombra dura) y diálogos en 8 bits con la letra pixelada
+  Press Start 2P (`fuente.pixel`).
 
 ## Probarla en tu Android
 
@@ -76,21 +77,27 @@ src/
 │   └── Ubicacion.tsx         # GPS con permiso; si no, la ciudad elegida
 ├── hooks/                    # datos con caché (React Query) y estado guardado
 │   ├── usePronostico.ts useAire.ts useNoticias.ts useDolar.ts
+│   ├── useFotoNoticia.ts     # busca la foto de las noticias que llegan sin ella
+│   ├── useMusicaRubo.ts      # música por fase, voz de Rubo y golpes (expo-audio)
 │   ├── useAvisos.ts          # programa las notificaciones de lluvia, calor y aire limpio
 │   ├── useRecordado.ts       # recuerda lo elegido en cada pantalla
 │   └── useVictoriasRubo.ts   # victorias del Rubo (desbloqueo del modo IA)
 ├── lib/                      # lógica sin React (probada con node:test)
 │   ├── clima/                # Open-Meteo, METAR, resumen, lluvia, respaldo sin señal, códigos WMO
 │   ├── aire/                 # Open-Meteo Air Quality e ICA colombiano
-│   ├── noticias/             # fuentes (RSS / JSON:API) y combinación sin repetidas
+│   ├── noticias/             # fuentes (RSS / JSON:API), combinación sin repetidas y fotos (foto.ts)
 │   ├── ciudades.ts           # ciudades y sus municipios
 │   ├── pong.ts               # física del Rubo y cómo juega la máquina en cada nivel y fase
+│   ├── dialogo.ts            # frases de Rubo y el tiempo de cada letra
 │   ├── avisos.ts dolar.ts preferencias.ts ubicacion.ts http.ts …
 │   └── accesos.ts            # ← para agregar un acceso rápido, se edita esta lista
 └── theme.ts                  # colores claro/oscuro, fuentes y medidas
 tests/                        # pruebas unitarias; tests/fixtures/ tiene respuestas reales grabadas
 assets/                       # íconos (ver assets/README.md), logo en assets/marca/, foto de RuboKill
+                              # y sonidos/ (canciones de cada fase y la voz de Rubo)
 scripts/generar-iconos.py     # regenera los íconos desde el logo
+scripts/generar-voces.ts      # genera la voz de Rubo de cada frase (con los tiempos de lib/dialogo.ts)
+scripts/generar-sonidos.py    # genera los golpes y la estática de los glitches (8 bits)
 ```
 
 ### Agregar un acceso rápido
