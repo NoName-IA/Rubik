@@ -1,7 +1,7 @@
-// Ciudades y municipios que se pueden elegir sin GPS, y dónde aplica la alerta de arroyos (sin React, probado).
+// Ciudades y municipios que se pueden elegir sin GPS (sin React, probado).
 
-import type { Coordenadas } from "./clima/tipos.ts";
 import { distanciaKm } from "./clima/respaldo.ts";
+import type { Coordenadas } from "./clima/tipos.ts";
 
 /** Un municipio que se puede elegir; está dentro del área de una ciudad (ver `AREAS`). */
 export interface Ciudad {
@@ -9,8 +9,6 @@ export interface Ciudad {
   nombre: string;
   departamento: string;
   coordenadas: Coordenadas;
-  /** Los arroyos (calles que se vuelven ríos con los aguaceros) son propios del área de Barranquilla. */
-  arroyos: boolean;
   /** id del área (`AREAS`) a la que pertenece. */
   area: string;
 }
@@ -26,7 +24,7 @@ export interface Area {
 type Municipio = [id: string, nombre: string, latitud: number, longitud: number, departamento?: string];
 
 /** El primer municipio es la ciudad misma y comparte su id (así siguen valiendo las elecciones guardadas). */
-const area = (nombre: string, departamento: string, municipios: Municipio[], arroyos = false): Area => {
+const area = (nombre: string, departamento: string, municipios: Municipio[]): Area => {
   const id = municipios[0][0];
   return {
     id,
@@ -37,25 +35,19 @@ const area = (nombre: string, departamento: string, municipios: Municipio[], arr
       nombre: mnombre,
       departamento: mdep ?? departamento,
       coordenadas: { latitud, longitud },
-      arroyos,
       area: id,
     })),
   };
 };
 
 export const AREAS: Area[] = [
-  area(
-    "Barranquilla",
-    "Atlántico",
-    [
-      ["barranquilla", "Barranquilla", 10.9639, -74.7964],
-      ["soledad", "Soledad", 10.9184, -74.7646],
-      ["malambo", "Malambo", 10.8597, -74.7739],
-      ["puerto-colombia", "Puerto Colombia", 10.9878, -74.9547],
-      ["galapa", "Galapa", 10.8977, -74.8857],
-    ],
-    true,
-  ),
+  area("Barranquilla", "Atlántico", [
+    ["barranquilla", "Barranquilla", 10.9639, -74.7964],
+    ["soledad", "Soledad", 10.9184, -74.7646],
+    ["malambo", "Malambo", 10.8597, -74.7739],
+    ["puerto-colombia", "Puerto Colombia", 10.9878, -74.9547],
+    ["galapa", "Galapa", 10.8977, -74.8857],
+  ]),
   area("Cartagena", "Bolívar", [
     ["cartagena", "Cartagena", 10.391, -75.4794],
     ["turbaco", "Turbaco", 10.3317, -75.4128],
@@ -94,6 +86,7 @@ export const AREAS: Area[] = [
     ["mosquera", "Mosquera", 4.7059, -74.2302, "Cundinamarca"],
     ["funza", "Funza", 4.7166, -74.2116, "Cundinamarca"],
     ["zipaquira", "Zipaquirá", 5.0221, -74.0058, "Cundinamarca"],
+    ["tocancipa", "Tocancipá", 4.9653, -73.913, "Cundinamarca"],
   ]),
   area("Medellín", "Antioquia", [
     ["medellin", "Medellín", 6.2442, -75.5812],
@@ -139,10 +132,16 @@ export function buscarArea(id: string | null | undefined): Area | undefined {
   return AREAS.find((x) => x.id === id);
 }
 
-/** Radio alrededor de cada municipio con arroyos dentro del cual se activa la alerta (para el GPS). */
-export const RADIO_ARROYOS_KM = 12;
-
-/** ¿Aplica la alerta de arroyos en estas coordenadas? (área metropolitana de Barranquilla) */
-export function hayArroyos(coordenadas: Coordenadas): boolean {
-  return CIUDADES.some((x) => x.arroyos && distanciaKm(x.coordenadas, coordenadas) <= RADIO_ARROYOS_KM);
+/** El municipio de la lista más cercano a unas coordenadas, si hay uno a `radioKm` o menos. */
+export function municipioCercano(c: Coordenadas, radioKm: number): Ciudad | undefined {
+  let mejor: Ciudad | undefined;
+  let menor = radioKm;
+  for (const m of CIUDADES) {
+    const d = distanciaKm(m.coordenadas, c);
+    if (d <= menor) {
+      mejor = m;
+      menor = d;
+    }
+  }
+  return mejor;
 }

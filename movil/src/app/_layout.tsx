@@ -71,7 +71,7 @@ function Navegacion() {
   );
 }
 
-/** Notificaciones de lluvia, arroyos, calor y aire limpio (después de la bienvenida, para no pedir permisos antes). */
+/** Notificaciones de lluvia, calor y aire limpio (después de la bienvenida, para no pedir permisos antes). */
 function Avisos() {
   useAvisos();
   return null;

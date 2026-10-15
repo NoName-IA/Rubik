@@ -19,7 +19,7 @@ import { Panel } from "@/components/Panel";
 import { usePreferencias } from "@/contexto/Preferencias";
 import { useAire } from "@/hooks/useAire";
 import { useDolar } from "@/hooks/useDolar";
-import { useNoticias } from "@/hooks/useNoticias";
+import { useNoticias, useZonasNoticias } from "@/hooks/useNoticias";
 import { resumenDelDia, useObservacion, usePronostico } from "@/hooks/usePronostico";
 import { ACCESOS } from "@/lib/accesos";
 import { categoria } from "@/lib/aire/ica";
@@ -38,14 +38,14 @@ export default function Inicio() {
   const router = useRouter();
   const { data: clima, error: errorClima } = usePronostico();
   const obs = useObservacion();
-  // En Inicio no va el aviso de arroyos (está en Clima): solo la frase de lluvia.
-  const resumen = clima ? resumenDelDia(clima, null, obs) : null;
+  const resumen = clima ? resumenDelDia(clima, obs) : null;
   const codigo = clima ? codigoActual(clima.actual.codigo, obs) : 0;
   const { nombre } = usePreferencias().preferencias;
   const { data: aire, error: errorAire } = useAire();
   const pm25 = aire ? promedio24h(aire, "pm25") : null;
-  const { data: noticias, error: errorNoticias } = useNoticias("barranquilla");
-  // Titular de un medio local directo (El Heraldo o Zona Cero); si no hay, el más reciente de cualquiera.
+  // Titular de lo de cerca (la ciudad o el municipio de la ubicación).
+  const { data: noticias, error: errorNoticias } = useNoticias(useZonasNoticias()[0].destino);
+  // De un medio con foto (El Heraldo, Zona Cero o Bing); si no hay, el más reciente de cualquiera.
   const titular = noticias?.noticias.find((n) => n.fuente !== "google") ?? noticias?.noticias[0];
   const { data: trm, error: errorDolar } = useDolar();
   const dolar = trm ? vigente(trm, hoyColombia(trm.obtenido)) : null;

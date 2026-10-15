@@ -1,7 +1,7 @@
 // Fuentes de noticias locales: lectura de RSS y del JSON:API de Zona Cero (sin React, probado).
 
 export type Zona = "barranquilla" | "atlantico";
-export type Fuente = "elheraldo" | "zonacero" | "google";
+export type Fuente = "elheraldo" | "zonacero" | "google" | "bing";
 
 export interface Noticia {
   id: string;
@@ -18,9 +18,21 @@ export const NOMBRE_FUENTE: Record<Fuente, string> = {
   elheraldo: "El Heraldo",
   zonacero: "Zona Cero",
   google: "Google Noticias",
+  bing: "Bing Noticias",
 };
 
-export const URLS: Record<Fuente, Record<Zona, string>> = {
+/**
+ * Búsquedas para cualquier lugar (fuera de Barranquilla): Google Noticias y Bing Noticias, las dos
+ * del último día o semana, en español de Colombia. Bing sí trae foto.
+ */
+export function urlGoogleBusqueda(consulta: string): string {
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(consulta)}+when:7d&hl=es-419&gl=CO&ceid=CO:es-419`;
+}
+export function urlBing(consulta: string): string {
+  return `https://www.bing.com/news/search?q=${encodeURIComponent(consulta)}&format=rss&setlang=es&cc=CO`;
+}
+
+export const URLS: Record<"elheraldo" | "zonacero" | "google", Record<Zona, string>> = {
   // El feed de la sección Barranquilla quedó vacío el 2026-10-12 (responde solo la cabecera XML).
   // Se usa el de Atlántico para ambas zonas y en Barranquilla se filtran las notas de la ciudad.
   elheraldo: {
@@ -135,6 +147,27 @@ export function deGoogle(xml: string): Noticia[] {
     const titulo = medio && i.titulo.endsWith(` - ${medio}`) ? i.titulo.slice(0, -(medio.length + 3)) : i.titulo;
     return { id: i.enlace, titulo, medio: medio || "Google Noticias", fecha: i.fecha, url: i.enlace, imagen: null, fuente: "google" };
   });
+}
+
+/**
+ * Bing Noticias: el enlace es un redireccionador con la nota real en `url=`, el medio va en
+ * `News:Source` y la foto en `News:Image` (se pide en https y a 640 × 360).
+ */
+export function deBing(xml: string): Noticia[] {
+  const items = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
+  const notas = items.flatMap((item): Noticia[] => {
+    const titulo = etiqueta(item, "title");
+    const enlace = etiqueta(item, "link");
+    const fecha = Date.parse(etiqueta(item, "pubDate") ?? "");
+    if (!titulo || !enlace || Number.isNaN(fecha)) return [];
+    const real = enlace.match(/[?&]url=([^&]+)/);
+    const url = real ? decodeURIComponent(real[1]) : enlace;
+    const foto = etiqueta(item, "News:Image");
+    const imagen = foto ? `${foto.replace(/^http:/, "https:")}&w=640&h=360&c=14` : null;
+    return [{ id: url, titulo, medio: etiqueta(item, "News:Source") ?? "Bing Noticias", fecha, url, imagen, fuente: "bing" }];
+  });
+  if (notas.length === 0) throw new Error("Bing Noticias: el feed llegó sin noticias");
+  return notas;
 }
 
 interface RespuestaZonaCero {

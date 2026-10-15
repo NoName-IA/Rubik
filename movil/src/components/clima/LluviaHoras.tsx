@@ -2,7 +2,6 @@
 // Altura de la barra = probabilidad (escala fija 0–100 %); color = intensidad esperada (mm/h).
 // Tocar una barra muestra sus valores; debajo hay una tabla equivalente.
 
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
@@ -12,9 +11,7 @@ import { Panel } from "@/components/Panel";
 import { diaCorto } from "@/lib/fecha";
 import { formatoHora, proximasHoras } from "@/lib/clima/formato";
 import { INTENSIDADES, intensidad, milimetros, nombreIntensidad, resumirLluvia } from "@/lib/clima/lluvia";
-import { horaConRiesgo } from "@/lib/clima/resumen";
 import type { Hora, Pronostico } from "@/lib/clima/tipos";
-import { useUmbralArroyos } from "@/hooks/useUmbralArroyos";
 import { espacio, radio, useColores } from "@/theme";
 
 const ALTO = 140;
@@ -24,9 +21,6 @@ const MARCAS = [100, 50, 0];
 
 export function LluviaHoras({ p }: { p: Pronostico }) {
   const c = useColores();
-  const umbral = useUmbralArroyos();
-  // Sin umbral (ciudad sin arroyos) no se marca ninguna hora.
-  const riesgo = (h: Hora) => (umbral ? horaConRiesgo(h, umbral) : false);
   const horas = proximasHoras(p, 48);
   const [elegida, setElegida] = useState(0);
   const [verTabla, setVerTabla] = useState(false);
@@ -61,9 +55,6 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
               <Text style={styles.detalleValor}>{sel.probabilidad ?? 0} %</Text> de probabilidad ·{" "}
               {milimetros(sel.mm)} ({nombreIntensidad(sel.mm).toLowerCase()})
             </Text>
-            {riesgo(sel) ? (
-              <Text style={{ color: c.alerta, fontWeight: "700" }}>⚠ Riesgo de arroyos</Text>
-            ) : null}
           </View>
         ) : null}
 
@@ -94,7 +85,7 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
                       onPress={() => setElegida(i)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: i === elegida }}
-                      accessibilityLabel={`${etiquetaHora(h, i)}: ${prob} por ciento de probabilidad, ${milimetros(h.mm)}, ${nombreIntensidad(h.mm)}${riesgo(h) ? ", riesgo de arroyos" : ""}`}
+                      accessibilityLabel={`${etiquetaHora(h, i)}: ${prob} por ciento de probabilidad, ${milimetros(h.mm)}, ${nombreIntensidad(h.mm)}`}
                       style={[
                         styles.columna,
                         i === elegida && { backgroundColor: c.enfasisSuave },
@@ -105,7 +96,6 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
                         {medianoche ? diaCorto(h.hora) : " "}
                       </Text>
                       <View style={styles.zonaBarra}>
-                        {riesgo(h) ? <Ionicons name="warning" size={12} color={c.alerta} style={styles.riesgo} /> : null}
                         <View
                           style={[
                             styles.barra,
@@ -141,12 +131,6 @@ export function LluviaHoras({ p }: { p: Pronostico }) {
             </View>
           ))}
         </View>
-        {horas.some(riesgo) ? (
-          <View style={styles.itemLeyenda}>
-            <Ionicons name="warning" size={12} color={c.alerta} />
-            <Text style={{ color: c.tinta2, fontSize: 12 }}>Riesgo de arroyos (≥ {umbral?.probabilidad} % con aguacero o tormenta)</Text>
-          </View>
-        ) : null}
         <Text style={{ color: c.apagado, fontSize: 12 }}>
           Altura: probabilidad de lluvia. Color: milímetros esperados en esa hora. Toca una barra para ver el detalle.
         </Text>
@@ -190,7 +174,6 @@ const styles = StyleSheet.create({
   dia: { fontSize: 10, height: 14, fontWeight: "700" },
   zonaBarra: { height: ALTO, justifyContent: "flex-end", marginBottom: 22 },
   // Extremo superior redondeado; la base queda apoyada en el eje.
-  riesgo: { marginBottom: 2 },
   barra: { width: ANCHO_BARRA, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   filaHoras: { position: "absolute", top: 14 + ALTO + 4, height: 16 },
   hora: { position: "absolute", width: 60, fontSize: 10, textAlign: "center" },

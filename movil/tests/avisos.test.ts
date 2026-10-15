@@ -4,8 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Aire } from "../src/lib/aire/openMeteoAire.ts";
-import { ANTES_ARROYOS, ANTES_CALOR, ANTES_LLUVIA, instante, planearAvisos } from "../src/lib/avisos.ts";
-import { UMBRAL_ARROYOS } from "../src/lib/clima/resumen.ts";
+import { ANTES_CALOR, ANTES_LLUVIA, instante, planearAvisos } from "../src/lib/avisos.ts";
 import type { Hora, Pronostico } from "../src/lib/clima/tipos.ts";
 import { leerPreferencias } from "../src/lib/preferencias.ts";
 
@@ -23,8 +22,8 @@ function pronostico(inicio: string, lluvia: Record<string, [number, number, numb
 }
 
 const ahora = instante("2026-10-12T08:10", COLOMBIA);
-const TODO = { lluvia: true, arroyos: UMBRAL_ARROYOS, calor: true, aire: null };
-const NADA = { lluvia: false, arroyos: null, calor: false, aire: null };
+const TODO = { lluvia: true, calor: true, aire: null };
+const NADA = { lluvia: false, calor: false, aire: null };
 
 test("hora local → instante (Colombia es UTC−5)", () => {
   assert.equal(new Date(instante("2026-10-12T15:00", COLOMBIA)).toISOString(), "2026-10-12T20:00:00.000Z");
@@ -44,35 +43,25 @@ test("lluvia: 30 min antes, con el rango y la hora más fuerte", () => {
   assert.equal(a.cuerpo, "Posible lluvia entre 2 y 5 p. m.; lo más fuerte, a las 3.");
 });
 
-test("arroyos: 1 h antes y reemplaza al aviso de lluvia de esas horas", () => {
-  const p = pronostico("2026-10-12T08:00", { "2026-10-12T15:00": [70, 2], "2026-10-12T16:00": [80, 6], "2026-10-12T17:00": [70, 1] });
-  const avisos = planearAvisos(p, TODO, ahora);
-  assert.deepEqual(avisos.map((a) => a.id), ["arroyos:2026-10-12T16:00"]);
-  assert.equal(avisos[0].fecha, instante("2026-10-12T16:00", COLOMBIA) - ANTES_ARROYOS);
-  assert.equal(avisos[0].cuerpo, "Riesgo de arroyos a las 4 p. m. No cruces calles con corriente.");
-});
-
-test("sin umbral de arroyos (fuera del área o desactivado) solo avisa la lluvia", () => {
-  const p = pronostico("2026-10-12T08:00", { "2026-10-12T16:00": [80, 6] });
-  assert.deepEqual(planearAvisos(p, { ...NADA, lluvia: true }, ahora).map((a) => a.id), ["lluvia:2026-10-12T16:00"]);
+test("un aguacero fuerte avisa como cualquier lluvia; con la lluvia apagada no avisa", () => {
+  const p = pronostico("2026-10-12T08:00", { "2026-10-12T16:00": [80, 6, 95] });
+  assert.deepEqual(planearAvisos(p, TODO, ahora).map((a) => a.id), ["lluvia:2026-10-12T16:00"]);
   assert.deepEqual(planearAvisos(p, NADA, ahora), []);
 });
 
 test("no avisa lo que ya empezó o tocaría en menos de un minuto", () => {
   const p = pronostico("2026-10-12T08:00", { "2026-10-12T08:00": [90, 8], "2026-10-12T09:00": [90, 8] });
-  // Riesgo desde las 8: el aviso habría sido a las 7, ya pasó.
+  // Lluvia desde las 8: el aviso habría sido a las 7:30, ya pasó.
   assert.deepEqual(planearAvisos(p, TODO, ahora), []);
 });
 
-test("la lluvia de madrugada no suena; los arroyos sí, y dicen 'mañana' si cruzan la medianoche", () => {
+test("la lluvia de madrugada no suena, aunque sea fuerte", () => {
   const p = pronostico("2026-10-12T08:00", { "2026-10-13T03:00": [80, 1], "2026-10-13T00:00": [90, 10, 95] });
-  const avisos = planearAvisos(p, TODO, ahora);
-  assert.deepEqual(avisos.map((a) => a.id), ["arroyos:2026-10-13T00:00"]);
-  assert.match(avisos[0].cuerpo, /^Riesgo de arroyos mañana a las 12 a\. m\./);
+  assert.deepEqual(planearAvisos(p, TODO, ahora), []);
 });
 
 test("preferencias: las de versiones anteriores con avisos apagados ya no los guardan", () => {
-  const leidas = leerPreferencias(JSON.stringify({ tema: "oscuro", avisos: { lluvia: false, arroyos: false } }));
+  const leidas = leerPreferencias(JSON.stringify({ tema: "oscuro", avisos: { lluvia: false } }));
   assert.equal(leidas.tema, "oscuro");
   assert.equal("avisos" in leidas, false);
 });

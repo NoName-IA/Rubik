@@ -83,7 +83,7 @@ export default function Usuario() {
           <Text style={[styles.nota, { color: c.tinta2 }]}>
             {permisoAvisos.estado === "denegado"
               ? "Las notificaciones están bloqueadas para Rubik en los ajustes del celular."
-              : "Falta el permiso para avisarte de lluvia, arroyos, calor y aire limpio."}
+              : "Falta el permiso para avisarte de lluvia, calor y aire limpio."}
           </Text>
           <Presionable onPress={permisoAvisos.pedir} accessibilityRole="button" style={styles.boton}>
             <Text style={{ color: c.enfasis, fontWeight: "600" }}>
@@ -105,17 +105,12 @@ export default function Usuario() {
             alCambiar={(v) => cambiar({ rubokill: v === "si" })}
             dentroDePanel
           />
-          <Text style={[styles.nota, { color: c.tinta2 }]}>Si pierdes contra la IA en el Rubo, Rubo aparece en toda la pantalla.</Text>
+          <Text style={[styles.nota, { color: c.tinta2 }]}>RuboKill...</Text>
         </Panel>
       ) : null}
 
       <Panel titulo="Acerca de">
-        <Text style={[styles.nota, { color: c.tinta2 }]}>
-          Cada noticia se abre en el sitio del medio que la publicó.
-        </Text>
-        <Text style={[styles.nota, { color: c.apagado }]}>
-          {Constants.expoConfig?.name ?? "Rubik"} · versión {Constants.expoConfig?.version ?? "—"}
-        </Text>
+        <Text style={[styles.nota, { color: c.tinta2 }]}>Versión {Constants.expoConfig?.version ?? "—"}</Text>
       </Panel>
     </Pantalla>
   );

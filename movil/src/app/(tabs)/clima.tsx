@@ -1,7 +1,7 @@
 // Clima: Hoy, Lluvia y 7 días (la calidad del aire irá dentro de Hoy).
 
 
-import { AlertaArroyos, AvisoSinConexion } from "@/components/clima/Avisos";
+import { AvisoSinConexion } from "@/components/clima/Avisos";
 import { ClimaHoy } from "@/components/clima/ClimaHoy";
 import { LluviaHoras } from "@/components/clima/LluviaHoras";
 import { Semana } from "@/components/clima/Semana";
@@ -10,9 +10,8 @@ import { LineaUbicacion } from "@/components/LineaUbicacion";
 import { Pantalla } from "@/components/Pantalla";
 import { Panel } from "@/components/Panel";
 import { Segmentos } from "@/components/Segmentos";
-import { resumenDelDia, usePronostico } from "@/hooks/usePronostico";
+import { usePronostico } from "@/hooks/usePronostico";
 import { useRecordado } from "@/hooks/useRecordado";
-import { useUmbralArroyos } from "@/hooks/useUmbralArroyos";
 
 const VISTAS = [
   { clave: "hoy", titulo: "Hoy" },
@@ -25,15 +24,12 @@ type Vista = (typeof VISTAS)[number]["clave"];
 export default function Clima() {
   const [vista, setVista] = useRecordado<Vista>("clima:vista", "hoy", VISTAS.map((v) => v.clave));
   const { data, error, isPending, isRefetching, refetch } = usePronostico();
-  const umbral = useUmbralArroyos();
-  const resumen = data ? resumenDelDia(data, umbral) : null;
 
   return (
     <Pantalla titulo="Clima" subtitulo={<LineaUbicacion />} alRefrescar={() => refetch()} refrescando={isRefetching}>
       <Segmentos opciones={VISTAS} valor={vista} alCambiar={setVista} />
 
       {data ? <AvisoSinConexion p={data} /> : null}
-      {resumen ? <AlertaArroyos ventanas={resumen.arroyos} hoy={resumen.hoy} ahora={resumen.ahora} /> : null}
       {data ? (
         vista === "hoy" ? (
           <ClimaHoy p={data} />

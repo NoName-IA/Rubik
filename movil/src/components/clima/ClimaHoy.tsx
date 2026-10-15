@@ -37,7 +37,7 @@ export function ClimaHoy({ p }: { p: Pronostico }) {
             <Text style={[styles.descripcion, { color: c.tinta }]}>{textoClima(codigo)}</Text>
           </View>
         </View>
-        <Text style={[styles.frase, { color: c.tinta }]}>{resumenDelDia(p, null, obs).frase}</Text>
+        <Text style={[styles.frase, { color: c.tinta }]}>{resumenDelDia(p, obs).frase}</Text>
         <Text style={{ color: c.tinta2, fontSize: 15 }}>
           Se siente como <Text style={{ color: c.tinta, fontWeight: "700" }}>{grados(a.sensacion)}</Text>
           {hoy ? ` · Máx. ${grados(hoy.maxima)} · Mín. ${grados(hoy.minima)}` : ""}

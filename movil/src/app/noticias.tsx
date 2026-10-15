@@ -1,4 +1,5 @@
-// Noticias de Barranquilla y el Atlántico (acceso rápido): El Heraldo + Zona Cero, todas con foto.
+// Noticias locales (acceso rápido) según la ubicación: en Barranquilla, El Heraldo + Zona Cero (todas
+// con foto) de Barranquilla y el Atlántico; en otro lugar, Bing y Google Noticias del municipio y del departamento.
 
 import { StyleSheet, View } from "react-native";
 
@@ -8,27 +9,24 @@ import { TarjetaNoticia } from "@/components/noticias/TarjetaNoticia";
 import { Pantalla } from "@/components/Pantalla";
 import { Panel } from "@/components/Panel";
 import { Segmentos } from "@/components/Segmentos";
-import { useNoticias } from "@/hooks/useNoticias";
+import { useNoticias, useZonasNoticias } from "@/hooks/useNoticias";
 import { useRecordado } from "@/hooks/useRecordado";
 import { deCuando } from "@/lib/clima/formato";
-import type { Zona } from "@/lib/noticias/fuentes";
 import { espacio, radio, useColores } from "@/theme";
 
-const ZONAS = [
-  { clave: "barranquilla", titulo: "Barranquilla" },
-  { clave: "atlantico", titulo: "Atlántico" },
-] as const;
 
 export default function Noticias() {
   const c = useColores();
-  const [zona, setZona] = useRecordado<Zona>("noticias:zona", "barranquilla", ZONAS.map((z) => z.clave));
-  const { data, error, isPending, isRefetching, refetch } = useNoticias(zona);
+  const zonas = useZonasNoticias();
+  const [clave, setClave] = useRecordado<"cerca" | "region">("noticias:alcance", "cerca", ["cerca", "region"]);
+  const zona = zonas.find((z) => z.clave === clave) ?? zonas[0];
+  const { data, error, isPending, isRefetching, refetch } = useNoticias(zona.destino);
   // Referencia para "hace 2 h": la hora de la descarga (se renueva cada 15 min).
   const ahora = data?.obtenido ?? 0;
 
   return (
     <Pantalla bordeSuperior={false} alRefrescar={() => refetch()} refrescando={isRefetching} botonArriba>
-      <Segmentos opciones={ZONAS} valor={zona} alCambiar={setZona} />
+      {zonas.length > 1 ? <Segmentos opciones={zonas} valor={zona.clave} alCambiar={setClave} /> : null}
 
       {data?.guardado ? (
         <Aviso texto={`Sin conexión · noticias ${deCuando(data.obtenido, -new Date(data.obtenido).getTimezoneOffset() * 60)}`} />

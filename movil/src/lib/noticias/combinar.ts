@@ -1,6 +1,9 @@
 // Une las tres fuentes, quita duplicados y ordena (sin React, probado con node:test).
 
-import type { Fuente, Noticia } from "./fuentes.ts";
+import type { Noticia } from "./fuentes.ts";
+
+/** Medios que llegan directo (no por un buscador de noticias). */
+export type Directa = "elheraldo" | "zonacero";
 
 const VACIAS = new Set(
   "a al ante con contra de del desde el en entre es este esta estos estas hacia hasta la las lo los para por que se sin sobre su sus tras un una uno unos unas y o".split(
@@ -32,7 +35,7 @@ export function similitud(a: string, b: string): number {
 }
 
 export const UMBRAL_DUPLICADO = 0.8;
-const MEDIO_DIRECTO: Record<Exclude<Fuente, "google">, RegExp> = {
+const MEDIO_DIRECTO: Record<Directa, RegExp> = {
   elheraldo: /el ?heraldo/i,
   zonacero: /zona ?cero/i,
 };
@@ -46,7 +49,7 @@ export interface OpcionesCombinar {
   ventana?: number;
   maximo?: number;
   /** Fuentes directas que sí respondieron: sus notas en Google se descartan. */
-  directasOk?: Exclude<Fuente, "google">[];
+  directasOk?: Directa[];
 }
 
 /** Mínimo de cupos para Google Noticias (variedad de medios) cuando hay muchas notas directas. */

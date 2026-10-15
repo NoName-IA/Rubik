@@ -1,30 +1,26 @@
 # Rubik (app móvil)
 
-App de React Native + Expo (SDK 57) para el día a día en Barranquilla: clima, lluvia, calidad del
-aire y noticias.
-
-Clima tiene datos reales (Open-Meteo) de la ubicación del GPS, o de
-Barranquilla si no se da permiso: **Hoy**, **Lluvia** (gráfica de 48 h) y **7 días**, con una frase
-de resumen ("Lloverá entre 2 y 5 p. m."), **alerta de arroyos** y el último pronóstico guardado
-para cuando no hay señal. La **calidad del aire** (ICA colombiano, PM2.5 y PM10 frente a la norma
-y la OMS) va dentro de Clima y en el resumen de Inicio. **Noticias** (El Heraldo y Zona Cero, todas con foto;
-filtro Barranquilla/Atlántico) se abre desde los accesos rápidos, y el titular más reciente
-aparece en el resumen de Inicio. En **Usuario** se guardan el nombre del saludo, la ubicación (GPS o
-una ciudad de la lista), la sensibilidad de la alerta de arroyos (solo en el área de Barranquilla), las
-notificaciones de lluvia y arroyos (`src/lib/avisos.ts` + `src/hooks/useAvisos.ts`) y el tema. La pestaña
-**Dólar** muestra la TRM oficial de hoy, su evolución y un conversor.
+App de React Native + Expo (SDK 57, Expo Router) para el día a día en Barranquilla y otras ciudades
+de Colombia. Versión **1.3.0** (`app.json`). Qué hace cada pantalla, de dónde salen los datos y la
+lógica propia: ver el [README principal](../README.md).
 
 ## Estilo visual
 
-Copiado de `portfolio_web` (VSCODEX): fondo índigo `#0F0D29` (sin el degradado del portfolio) con un
-solo cubo de Rubik grande en líneas tenues y una "lluvia" de caracteres de código, acento violeta `#A78BFA` (`#7C3AED` en modo claro), títulos en **Space Grotesk** y
-texto en **Inter**, tarjetas con borde violeta y esquinas de 16. Todo está en `src/theme.ts`; los textos
-usan `src/components/Texto.tsx`, que elige la variante de Inter según el grosor.
+Tomado de `portfolio_web` (VSCODEX): fondo índigo liso `#0F0D29`, acento violeta `#A78BFA`
+(`#7C3AED` en modo claro), títulos en **Space Grotesk** y texto en **Inter**, tarjetas con borde
+violeta tenue y esquinas de 16. Modo claro y oscuro (o el del sistema), con contrastes de texto
+≥ 4,5:1. Todo está en `src/theme.ts`; los textos usan `src/components/Texto.tsx`, que elige la
+variante de Inter según el grosor.
 
-Navegación: el navbar (`src/components/BarraLiquida.tsx`) tiene una "gota" que se desliza a la pestaña
-elegida estirándose (efecto líquido). Atrás vuelve a la pestaña anterior (`backBehavior="history"`), y
-la app recuerda lo elegido en cada pantalla (vista de Clima, filtro de Noticias, período y conversor
-del Dólar) con `src/hooks/useRecordado.ts`, aunque se cierre.
+- **Navbar** (`src/components/BarraLiquida.tsx`): una "gota" se desliza a la pestaña elegida
+  estirándose (efecto líquido). Atrás vuelve a la pestaña anterior (`backBehavior="history"`).
+- **Entradas**: los bloques de cada pantalla aparecen subiendo, escalonados, cada vez que se entra
+  (`Entrada` en `src/components/Movimiento.tsx`). Los botones se encogen un poco al tocarlos
+  (`Presionable`). Con "reducir movimiento" del sistema no hay animaciones.
+- **Recuerda lo elegido** en cada pantalla (vista de Clima, filtro de Noticias, período y conversor
+  del Dólar, nivel del Rubo) con `src/hooks/useRecordado.ts`, aunque se cierre la app.
+- **Rubo** tiene su propio estilo: menú con fondo cuadriculado, cancha roja en el modo IA y
+  resultado y diálogos brutalistas (bloque de color, borde grueso, sombra dura).
 
 ## Probarla en tu Android
 
@@ -40,31 +36,77 @@ del Dólar) con `src/hooks/useRecordado.ts`, aunque se cierre.
 
 Los cambios en el código se ven en el celular al guardar.
 
+**Solo en desarrollo (Expo Go):** en el menú del Rubo, mantener presionado el ícono del control
+alterna entre borrar el progreso (modo IA bloqueado, con cadenas) y desbloquearlo (con las cadenas
+por romper). En el APK no hace nada.
+
+## Compilar el APK
+
+Con [EAS](https://docs.expo.dev/eas/) (`eas.json`), en la nube:
+
+| Perfil | Resultado |
+|---|---|
+| `preview` | APK para instalar directo (distribución interna) |
+| `production` | App bundle (`.aab`) para la Play Store |
+
+```bash
+npx eas-cli@latest build --platform android --profile preview
+```
+
+La versión (`version` y `android.versionCode`) se sube a mano en `app.json` antes de cada build.
+
 ## Estructura
 
 ```
 src/
-├── app/                    # rutas (Expo Router): cada archivo es una pantalla
-│   ├── _layout.tsx         # raíz: navbar + pantallas apiladas
-│   ├── (tabs)/             # navbar inferior: exactamente 4 pestañas
-│   │   ├── index.tsx       # Inicio: resumen + carrusel de accesos rápidos
-│   │   ├── clima.tsx       # Hoy · Lluvia · 7 días
-│   │   ├── dolar.tsx       # TRM, evolución y conversor
-│   │   └── usuario.tsx     # preferencias
-│   ├── noticias.tsx        # acceso rápido
-│   └── aire.tsx            # detalle de la calidad del aire
-├── components/             # Pantalla, Panel, Carrusel, Bienvenida, Estados, clima/…
-├── contexto/Ubicacion.tsx  # GPS con permiso; si no, Barranquilla
-├── hooks/usePronostico.ts  # pronóstico con caché (React Query, 15 min)
-├── lib/                    # lógica sin React (probada con node:test)
-│   ├── clima/              # modelo, proveedor Open-Meteo, códigos WMO, formatos
-│   ├── ubicacion.ts        # nombre del lugar, redondeo de coordenadas
-│   └── accesos.ts          # ← para agregar un acceso rápido, se edita esta lista
-└── theme.ts                # colores claro/oscuro
-tests/                      # pruebas unitarias
-assets/                     # íconos (ver assets/README.md); originales del logo en assets/marca/
-scripts/generar-iconos.py   # regenera los íconos desde el logo
+├── app/                      # rutas (Expo Router): cada archivo es una pantalla
+│   ├── _layout.tsx           # raíz: fuentes, preferencias, bienvenida y pantallas apiladas
+│   ├── (tabs)/               # navbar inferior: exactamente 4 pestañas
+│   │   ├── index.tsx         # Inicio: resumen + carrusel de accesos rápidos
+│   │   ├── clima.tsx         # Hoy · Lluvia · 7 días
+│   │   ├── dolar.tsx         # TRM, evolución y conversor
+│   │   └── usuario.tsx       # preferencias (y RuboKill cuando se desbloquea)
+│   ├── noticias.tsx          # acceso rápido
+│   ├── aire.tsx              # detalle de la calidad del aire
+│   └── pong.tsx              # Rubo: menú, juego, cadenas, glitches, fases de la IA y RuboKill
+├── components/               # Pantalla, Panel, Segmentos, Carrusel, Bienvenida, ListaCiudades, Estados…
+│   ├── clima/ aire/ dolar/ noticias/
+├── contexto/
+│   ├── Preferencias.tsx      # preferencias guardadas en el celular
+│   └── Ubicacion.tsx         # GPS con permiso; si no, la ciudad elegida
+├── hooks/                    # datos con caché (React Query) y estado guardado
+│   ├── usePronostico.ts useAire.ts useNoticias.ts useDolar.ts
+│   ├── useAvisos.ts          # programa las notificaciones de lluvia, calor y aire limpio
+│   ├── useRecordado.ts       # recuerda lo elegido en cada pantalla
+│   └── useVictoriasRubo.ts   # victorias del Rubo (desbloqueo del modo IA)
+├── lib/                      # lógica sin React (probada con node:test)
+│   ├── clima/                # Open-Meteo, METAR, resumen, lluvia, respaldo sin señal, códigos WMO
+│   ├── aire/                 # Open-Meteo Air Quality e ICA colombiano
+│   ├── noticias/             # fuentes (RSS / JSON:API) y combinación sin repetidas
+│   ├── ciudades.ts           # ciudades y sus municipios
+│   ├── pong.ts               # física del Rubo y cómo juega la máquina en cada nivel y fase
+│   ├── avisos.ts dolar.ts preferencias.ts ubicacion.ts http.ts …
+│   └── accesos.ts            # ← para agregar un acceso rápido, se edita esta lista
+└── theme.ts                  # colores claro/oscuro, fuentes y medidas
+tests/                        # pruebas unitarias; tests/fixtures/ tiene respuestas reales grabadas
+assets/                       # íconos (ver assets/README.md), logo en assets/marca/, foto de RuboKill
+scripts/generar-iconos.py     # regenera los íconos desde el logo
 ```
+
+### Agregar un acceso rápido
+
+1. Una entrada en `src/lib/accesos.ts` (título, ícono y ruta).
+2. Su pantalla en `src/app/`.
+
+El navbar no cambia: siempre son 4 pestañas.
+
+### Rendimiento del Rubo
+
+El juego corre en un ciclo por cuadro (`requestAnimationFrame`), pero React casi no redibuja: la
+bola y las barras son vistas que se mueven con `Animated.Value.setValue`, y la pantalla solo se
+vuelve a dibujar cuando cambia el marcador o la fase (saque, jugando, fin). Las animaciones de
+ambiente (glitches, cadenas, latidos, fondo rojo) usan el driver nativo y vistas simples, no SVG
+animado.
 
 ## Comandos
 
@@ -73,5 +115,6 @@ scripts/generar-iconos.py   # regenera los íconos desde el logo
 | `npx expo start` | Servidor de desarrollo (QR para Expo Go) |
 | `npm test` | Pruebas unitarias |
 | `npm run typecheck` | Revisión de tipos |
+| `npm run lint` | Lint (`expo lint`) |
 | `npx expo-doctor` | Revisa versiones y configuración de Expo |
 | `npx expo install <paquete>` | Instala dependencias compatibles con el SDK (en vez de `npm install`) |

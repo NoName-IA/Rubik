@@ -1,4 +1,4 @@
-// Notificaciones de lluvia, arroyos, mucho calor y aire limpio (sin React, probado con node:test).
+// Notificaciones de lluvia, mucho calor y aire limpio (sin React, probado con node:test).
 //
 // No hay servidor: cada vez que llega un pronóstico se calculan los avisos de las próximas 24 h
 // y el celular los programa como notificaciones locales, que suenan aunque la app esté cerrada.
@@ -6,14 +6,14 @@
 import { CATEGORIAS } from "./aire/ica.ts";
 import type { Aire } from "./aire/openMeteoAire.ts";
 import { ahoraLocal, grados, proximasHoras } from "./clima/formato.ts";
-import { aLas, cuando, fraseArroyos, rangoHoras, type Ventana, ventanasArroyos, ventanasLluvia } from "./clima/resumen.ts";
+import { aLas, cuando, rangoHoras, type Ventana, ventanasLluvia } from "./clima/resumen.ts";
 import type { Hora, HoraLocal, Pronostico } from "./clima/tipos.ts";
 
 export const RUTAS_AVISO = ["/clima", "/aire"] as const;
 export type RutaAviso = (typeof RUTAS_AVISO)[number];
 
 export interface Aviso {
-  /** Estable por ventana ("arroyos:2026-10-12T15:00"): reprogramar no duplica. */
+  /** Estable por ventana ("lluvia:2026-10-12T15:00"): reprogramar no duplica. */
   id: string;
   titulo: string;
   cuerpo: string;
@@ -25,17 +25,14 @@ export interface Aviso {
 
 export interface QueAvisar {
   lluvia: boolean;
-  /** Umbral de arroyos, o `null` si no se avisa (desactivado o fuera del área de Barranquilla). */
-  arroyos: { probabilidad: number; mm: number } | null;
   calor: boolean;
   /** Pronóstico de calidad del aire, o `null` si no se avisa (desactivado o aún sin datos). */
   aire: Aire | null;
 }
 
 /** Con cuánta anticipación se avisa. */
-export const ANTES_ARROYOS = 60 * 60_000;
 export const ANTES_LLUVIA = 30 * 60_000;
-/** Los avisos de lluvia no suenan entre las 10 p. m. y las 6 a. m. (los de arroyos sí). */
+/** Los avisos de lluvia no suenan entre las 10 p. m. y las 6 a. m. */
 const SILENCIO = { desde: 22, hasta: 6 };
 export const ANTES_CALOR = 60 * 60_000;
 /**
@@ -55,8 +52,6 @@ export function instante(hora: HoraLocal, desfaseUtc: number): number {
   return Date.parse(`${hora}:00Z`) - desfaseUtc * 1000;
 }
 
-const seSolapan = (a: Ventana, b: Ventana) => a.desde < b.hasta && b.desde < a.hasta;
-
 export function planearAvisos(p: Pronostico, que: QueAvisar, ahora: number = Date.now()): Aviso[] {
   const horas = proximasHoras(p, 24, ahora);
   const avisos: Aviso[] = [];
@@ -64,23 +59,8 @@ export function planearAvisos(p: Pronostico, que: QueAvisar, ahora: number = Dat
   /** Fecha local del momento del aviso: "mañana" se dice respecto a cuando suena. */
   const diaDe = (fecha: number) => ahoraLocal(p.desfaseUtc, fecha).slice(0, 10);
 
-  const arroyos = que.arroyos ? ventanasArroyos(horas, que.arroyos) : [];
-  for (const v of arroyos) {
-    const fecha = instante(v.desde, p.desfaseUtc) - ANTES_ARROYOS;
-    if (!futuro(fecha)) continue;
-    avisos.push({
-      id: `arroyos:${v.desde}`,
-      titulo: "Riesgo de arroyos",
-      cuerpo: `${conPunto(fraseArroyos(v, diaDe(fecha)))} No cruces calles con corriente.`,
-      fecha,
-      ruta: "/clima",
-    });
-  }
-
   if (que.lluvia) {
     for (const v of ventanasLluvia(horas)) {
-      // Si ya hay aviso de arroyos para esa lluvia, otro sería repetido.
-      if (arroyos.some((a) => seSolapan(a, v))) continue;
       const fecha = instante(v.desde, p.desfaseUtc) - ANTES_LLUVIA;
       const hora = Number(ahoraLocal(p.desfaseUtc, fecha).slice(11, 13));
       if (!futuro(fecha) || hora >= SILENCIO.desde || hora < SILENCIO.hasta) continue;

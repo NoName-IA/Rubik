@@ -1,8 +1,8 @@
 # Rubik
 
-App Android (React Native + Expo) para el día a día en Barranquilla: lluvia hora por hora con
-**alerta de arroyos**, calidad del aire con el índice colombiano, noticias locales y el **dólar**
-(TRM oficial).
+App Android (React Native + Expo) para el día a día en Barranquilla y otras ciudades de Colombia:
+lluvia hora por hora, calidad del aire con el índice colombiano, noticias locales, el **dólar**
+(TRM oficial) y **Rubo**, un Pong contra la máquina.
 
 ```
 Rubik/
@@ -16,12 +16,41 @@ Rubik/
 | Pestaña | Qué muestra |
 |---|---|
 | **Inicio** | Resumen del día (clima, lluvia, aire, último titular) y carrusel de accesos rápidos |
-| **Clima** | **Hoy**, **Lluvia** (gráfica de 48 h) y **7 días**; frase de resumen ("Lloverá entre 2 y 5 p. m."), alerta de arroyos y calidad del aire |
+| **Clima** | **Hoy**, **Lluvia** (gráfica de 48 h) y **7 días**; frase de resumen ("Hoy podría llover entre 2 y 5 p. m.") y calidad del aire |
 | **Dólar** | TRM oficial de hoy, su evolución (30 días, 90 días, 1 año) y un conversor |
-| **Usuario** | Nombre del saludo, ubicación (GPS o una ciudad de la lista), sensibilidad de la alerta de arroyos, notificaciones y tema |
+| **Usuario** | Nombre del saludo, ubicación (GPS o ciudad y municipio), permiso de notificaciones, tema y, cuando se desbloquea, **RuboKill** |
 
-**Noticias** (El Heraldo y Zona Cero, todas con foto; filtro Barranquilla/Atlántico) se abre desde
-los accesos rápidos de Inicio.
+Desde los accesos rápidos de Inicio se abren:
+
+- **Noticias** locales según la ubicación, sin repetidas. En el área de Barranquilla: El Heraldo y
+  Zona Cero, todas con foto, con filtro Barranquilla/Atlántico. En otro lugar: Bing Noticias y Google
+  Noticias del municipio y del departamento (p. ej. Tocancipá/Cundinamarca).
+- **Rubo**: Pong contra la máquina (ver más abajo).
+
+### Ubicación
+
+Con permiso, la app usa el GPS. Sin él, se elige primero la **ciudad** y luego el **municipio** de
+su área: 13 ciudades (Barranquilla, Cartagena, Santa Marta, Bogotá, Medellín, Cali…) con sus
+municipios cercanos (Soledad, Turbaco, Ciénaga, Soacha, Tocancipá, Bello, Floridablanca…).
+
+### Rubo
+
+Pong vertical: tu barra abajo (la mueves con el dedo), la de la máquina arriba. Gana quien llegue
+primero a **3**. Al terminar se ve el resultado y una rueda para jugar de nuevo.
+
+- **Normal**: la máquina falla de vez en cuando.
+- **IA**: empieza **encadenado**. Se desbloquea al ganar 2 veces en normal; entonces las cadenas
+  vibran y al tocarlas se rompen. La IA tiene tres fases según tus goles:
+  1. **0 goles**: juega como en normal.
+  2. **1 gol**: "¿Crees que puedes ganarme? -ja". Le dolió el golpe (su barra queda herida) y juega
+     mejor, pero todavía se le puede hacer otro gol.
+  3. **2 goles**: "¡¡Sal de aquí!!". Se pone imposible: no falla, ataca lejos de tu barra y la bola
+     se acelera. El fondo se tiñe de rojo y todo late con él.
+
+  Cada gol de la máquina hace fallar la pantalla (glitches), un poco más con cada uno.
+- **RuboKill** (en Usuario, apagado por defecto; solo aparece con la IA desbloqueada): en la IA la
+  bola va al doble de velocidad, los glitches son fuertes y, al perder, la pantalla se pone negra y
+  aparece Rubo. No cambia el modo normal.
 
 ## Fuentes de datos
 
@@ -30,36 +59,36 @@ La app consulta todo directamente desde el celular: no necesita servidor propio 
 | Dato | Fuente |
 |---|---|
 | Pronóstico y lluvia | [Open-Meteo](https://open-meteo.com/en/docs) |
+| Lluvia observada ahora | METAR del aeropuerto más cercano ([aviationweather.gov](https://aviationweather.gov/data/api/)) |
 | Calidad del aire | [Open-Meteo Air Quality](https://open-meteo.com/en/docs/air-quality-api) |
-| Noticias | RSS de El Heraldo y JSON:API de Zona Cero |
+| Noticias | RSS de El Heraldo, Google Noticias y Bing Noticias; JSON:API de Zona Cero |
 | TRM | Superintendencia Financiera vía datos.gov.co ([32sa-8pi3](https://www.datos.gov.co/d/32sa-8pi3)) |
 
 ## Lógica propia
 
-- **Alerta de arroyos** (solo en el área metropolitana de Barranquilla): una hora tiene riesgo si
-  la probabilidad de lluvia es **≥ 60 %** y hay **≥ 5 mm/h o tormenta eléctrica** (códigos WMO
-  95–99). Se contrastó con 93 días de datos horarios y 5 días con arroyos reportados por la prensa
-  (31 ago., 1, 20, 21 y 22 sept. de 2026):
-
-  | Regla | Días con alerta (de 93) | Días de prensa detectados |
-  |---|---|---|
-  | ≥ 60 % y ≥ 10 mm/h | 0 | 0 de 5 |
-  | ≥ 60 % y ≥ 5 mm/h | 4 | 1 de 5 |
-  | **≥ 60 % y (≥ 5 mm/h o tormenta)** | 19 | **5 de 5** |
-
-  El modelo subestima los aguaceros (el 20 de septiembre marcó como máximo 1,3 mm/h), pero el
-  código de tormenta sí aparece esos días. La regla es provisional: la muestra es pequeña y no mide
-  falsas alarmas. En Usuario se puede hacer más o menos sensible.
+- **Lo que pasa ahora manda sobre el pronóstico**: cerca de un aeropuerto (a 15 km o menos), su
+  reporte METAR de la última hora y media corrige la frase de la hora en curso. Comparado con las
+  estaciones del IDEAM de Barranquilla y Soledad (sept.–oct. 2026), cuando el pronóstico anunciaba
+  lluvia llovió el 13 % de las veces si el aeropuerto estaba seco y el 40 % si reportaba lluvia.
 - **Índice de calidad del aire (ICA)** con los puntos de corte de la Resolución 2254 de 2017 y
   comparación con la guía de la OMS.
-- **Resumen en una frase** de las próximas 24 h: agrupa las horas seguidas con probabilidad ≥ 50 %
-  y señala la más fuerte.
+- **Resumen en una frase** de hoy y mañana: agrupa las horas seguidas con probabilidad ≥ 50 % y al
+  menos 0,2 mm, y dice si es lluvia, llovizna o tormenta eléctrica. Se contrastó con 10 estaciones
+  automáticas del IDEAM en el Atlántico: sin exigir milímetros se anunciaba lluvia casi 3 veces más
+  de lo que llovía; con 0,2 mm, 1,3 veces. Como los aguaceros son muy locales, dice "podría".
 - **Notificaciones** (locales, sin servidor): cada vez que llega un pronóstico se programan avisos
   para las próximas 24 h, que suenan aunque la app esté cerrada. **Lluvia**: 30 min antes, solo
-  entre 6 a. m. y 10 p. m. **Arroyos**: 1 h antes, a cualquier hora, y reemplaza al de lluvia de
-  esas horas. Se activan o desactivan en Usuario; al tocar una se abre Clima.
-- **Sin señal**: el último pronóstico, las noticias y la TRM se guardan en el celular y se muestran
-  con la hora de los datos mientras se reintenta.
+  entre 6 a. m. y 10 p. m. **Mucho calor**: 1 h antes de que la sensación térmica llegue a 42°,
+  uno por día y nunca antes de las 7 a. m. **Aire limpio**: a las 7 a. m. de los días en que todas
+  las horas de la calle tienen aire "Bueno". Solo dependen del permiso del celular (se da desde
+  Usuario); al tocar una se abre Clima o la calidad del aire. En Expo Go para Android no funcionan.
+- **Sin señal**: el último pronóstico, la calidad del aire, las noticias y la TRM se guardan en el
+  celular y se muestran con la hora de los datos mientras se reintenta.
+- **Noticias sin repetidas**: se unen las fuentes y se quitan las notas que cuentan lo mismo
+  comparando las palabras de los titulares.
+- **Rubo**: la física (rebotes, aceleración, cómo juega la máquina en cada nivel y fase) se simula
+  en pasos cortos para que la bola nunca atraviese una barra; las pruebas juegan partidas completas
+  para comprobar que en normal la máquina falla y que a la IA nunca se le hace el tercer gol.
 
 Todo esto son funciones puras en `movil/src/lib/`, probadas con respuestas reales grabadas de cada
 fuente (`movil/tests/fixtures/`).
@@ -88,7 +117,8 @@ Desde `movil/`:
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | Lint |
 
-Estilo visual, estructura de carpetas y más comandos en [`movil/README.md`](movil/README.md).
+Estilo visual, estructura de carpetas, cómo compilar el APK y más comandos en
+[`movil/README.md`](movil/README.md).
 
 ## Licencia
 

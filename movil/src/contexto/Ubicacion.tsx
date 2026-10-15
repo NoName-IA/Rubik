@@ -7,7 +7,8 @@ import { AppState, Linking, Platform } from "react-native";
 
 import { usePreferencias } from "@/contexto/Preferencias";
 import type { Coordenadas } from "@/lib/clima/tipos";
-import { buscarCiudad, CIUDAD_INICIAL, hayArroyos } from "@/lib/ciudades";
+import { buscarCiudad, CIUDAD_INICIAL, municipioCercano } from "@/lib/ciudades";
+import type { Lugar } from "@/lib/noticias/lugar";
 import { nombreLugar } from "@/lib/ubicacion";
 
 const CLAVE_BIENVENIDA = "bienvenida-vista";
@@ -22,8 +23,8 @@ interface EstadoUbicacion {
   nombre: string;
   /** "ciudad": el usuario eligió una ciudad; "predeterminada": quiere GPS pero aún no hay posición. */
   origen: "gps" | "predeterminada" | "ciudad";
-  /** La alerta de arroyos aplica aquí (área metropolitana de Barranquilla). */
-  arroyos: boolean;
+  /** Municipio y departamento (para las noticias locales) y si es el área de Barranquilla. */
+  lugar: Lugar;
   permiso: Permiso;
   /** Pide el permiso (o abre los ajustes de Android si ya se negó "para siempre"). */
   pedirPermiso: () => Promise<void>;
@@ -54,7 +55,8 @@ export function ProveedorUbicacion({ children }: { children: ReactNode }) {
   const [bienvenidaVista, setBienvenidaVista] = useState(false);
   const [permiso, setPermiso] = useState<Permiso>("sin-preguntar");
   const [puedePreguntar, setPuedePreguntar] = useState(true);
-  const [gps, setGps] = useState<{ coordenadas: Coordenadas; nombre: string } | null>(null);
+  /** Posición del GPS; `municipio` y `departamento` llegan con el nombre del lugar (si hay geocodificador). */
+  const [gps, setGps] = useState<{ coordenadas: Coordenadas; nombre: string; municipio?: string; departamento?: string } | null>(null);
 
   // Cada lectura tiene un número: si llega una respuesta de una lectura vieja, se ignora
   // (evita que una posición antigua pise una más reciente).
@@ -67,12 +69,19 @@ export function ProveedorUbicacion({ children }: { children: ReactNode }) {
     const usar = (pos: Location.LocationObject) => {
       if (!vigente()) return;
       const coordenadas = { latitud: pos.coords.latitude, longitud: pos.coords.longitude };
-      setGps((previo) => ({ coordenadas, nombre: previo?.nombre ?? "Tu ubicación" }));
+      setGps((previo) => ({ ...previo, coordenadas, nombre: previo?.nombre ?? "Tu ubicación" }));
       // El nombre del barrio llega después, sin frenar la lectura. En la web no hay geocodificador.
       if (Platform.OS === "web") return;
       Location.reverseGeocodeAsync({ latitude: coordenadas.latitud, longitude: coordenadas.longitud })
         .then(([dir]) => {
-          if (vigente()) setGps({ coordenadas, nombre: nombreLugar(dir) });
+          if (vigente()) {
+            setGps({
+              coordenadas,
+              nombre: nombreLugar(dir),
+              municipio: dir?.city || dir?.subregion || undefined,
+              departamento: dir?.region || undefined,
+            });
+          }
         })
         .catch(() => {
           /* sin red o sin geocodificador: se queda el nombre anterior */
@@ -159,13 +168,20 @@ export function ProveedorUbicacion({ children }: { children: ReactNode }) {
   const valor = useMemo<EstadoUbicacion>(() => {
     const usaGps = !fija && gps !== null;
     const coordenadas = usaGps ? gps.coordenadas : ciudad.coordenadas;
+    // Con GPS: lo que diga el geocodificador o, si no, el municipio de la lista más cercano.
+    const cercano = usaGps ? municipioCercano(coordenadas, 30) : ciudad;
+    const lugar: Lugar = {
+      municipio: (usaGps ? gps.municipio : undefined) ?? cercano?.nombre ?? CIUDAD_INICIAL.nombre,
+      departamento: (usaGps ? gps.departamento : undefined) ?? cercano?.departamento ?? CIUDAD_INICIAL.departamento,
+      barranquilla: usaGps ? cercano?.area === "barranquilla" || (!gps.municipio && !cercano) : ciudad.area === "barranquilla",
+    };
     return {
       lista,
       bienvenidaVista,
       coordenadas,
       nombre: usaGps ? gps.nombre : ciudad.nombre,
       origen: fija ? "ciudad" : usaGps ? "gps" : "predeterminada",
-      arroyos: usaGps ? hayArroyos(coordenadas) : ciudad.arroyos,
+      lugar,
       permiso,
       pedirPermiso,
       terminarBienvenida,

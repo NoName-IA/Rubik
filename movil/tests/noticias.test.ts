@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import { antiguedad, combinar, CUPO_MINIMO_GOOGLE, palabras, similitud } from "../src/lib/noticias/combinar.ts";
-import { decodificar, deElHeraldo, deGoogle, deZonaCero, esDeBarranquilla, leerRss, type Noticia, URLS } from "../src/lib/noticias/fuentes.ts";
+import { deBing, decodificar, deElHeraldo, deGoogle, deZonaCero, esDeBarranquilla, leerRss, type Noticia, URLS } from "../src/lib/noticias/fuentes.ts";
+import { zonasNoticias } from "../src/lib/noticias/lugar.ts";
 
 const leer = (n: string) => readFileSync(new URL(`./fixtures/${n}`, import.meta.url), "utf-8");
 // Respuestas reales del 2026-10-12.
@@ -204,4 +205,53 @@ test("cliente: si caen todas, usa lo guardado; sin guardado, error", async () =>
   assert.equal(r.noticias.length, 30);
   await assert.rejects(noticiasConRespaldo("atlantico", pedidos(todas), a, () => AHORA), /ninguna fuente/);
   await assert.rejects(noticiasConRespaldo("barranquilla", pedidos(todas), a, () => AHORA + 8 * 24 * 3600_000), /ninguna fuente/);
+});
+
+test("Bing Noticias: nota real (no el redireccionador), medio y foto en https", () => {
+  const bing = deBing(leer("bing-noticias.xml"));
+  assert.ok(bing.length >= 5);
+  for (const n of bing) {
+    assert.equal(n.fuente, "bing");
+    assert.ok(!n.url.includes("bing.com"), n.url);
+    assert.ok(n.medio.length > 0);
+    if (n.imagen) assert.match(n.imagen, /^https:\/\/www\.bing\.com\/th\?id=.*&w=640&h=360/);
+  }
+  assert.ok(bing.some((n) => n.imagen), "trae fotos");
+  assert.equal(bing[0].medio, "Pulzo");
+  assert.match(bing[0].url, /^https:\/\/www\.pulzo\.com\//);
+  assert.throws(() => deBing('<?xml version="1.0"?><rss></rss>'), /sin noticias/);
+});
+
+test("zonas de noticias según el lugar", () => {
+  assert.deepEqual(
+    zonasNoticias({ municipio: "Soledad", departamento: "Atlántico", barranquilla: true }).map((z) => z.destino),
+    ["barranquilla", "atlantico"],
+  );
+  const [cerca, region] = zonasNoticias({ municipio: "Tocancipá", departamento: "Cundinamarca", barranquilla: false });
+  assert.equal(cerca.titulo, "Tocancipá");
+  assert.deepEqual(cerca.destino, { consulta: '"Tocancipá" Cundinamarca', clave: 'busqueda:"tocancipa" cundinamarca' });
+  assert.equal(region.titulo, "Cundinamarca");
+  // Bogotá D.C.: el departamento es la misma ciudad, así que hay una sola pestaña.
+  assert.equal(zonasNoticias({ municipio: "Bogotá", departamento: "Bogotá D.C.", barranquilla: false }).length, 1);
+});
+
+test("fuera de Barranquilla solo se buscan Google y Bing", async () => {
+  const pedidas: string[] = [];
+  const r = await cargarNoticias(
+    { consulta: '"Tocancipá" Cundinamarca', clave: "x" },
+    {
+      texto: async (u) => {
+        pedidas.push(u);
+        return u.includes("bing.com") ? leer("bing-noticias.xml") : leer("google-noticias.xml");
+      },
+      json: async () => {
+        throw new Error("no debería pedir Zona Cero");
+      },
+    },
+    () => Date.parse("2026-10-14T12:00:00Z"),
+  );
+  assert.equal(pedidas.length, 2);
+  assert.ok(pedidas.some((u) => u.startsWith("https://www.bing.com/news/search?q=%22Tocanc")));
+  assert.ok(pedidas.some((u) => u.startsWith("https://news.google.com/rss/search?q=%22Tocanc")));
+  assert.deepEqual(r.caidas, []);
 });

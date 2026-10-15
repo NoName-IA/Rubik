@@ -6,7 +6,7 @@ import { proximasHoras } from "@/lib/clima/formato";
 import { elegirObservacion, type Observacion, obtenerMetars } from "@/lib/clima/metar";
 import { openMeteo } from "@/lib/clima/openMeteo";
 import { conRespaldo } from "@/lib/clima/respaldo";
-import { fraseLluvia, UMBRAL_ARROYOS, ventanasArroyos } from "@/lib/clima/resumen";
+import { fraseLluvia } from "@/lib/clima/resumen";
 import type { Pronostico, ProveedorClima } from "@/lib/clima/tipos";
 import { ErrorRed } from "@/lib/http";
 import { redondear } from "@/lib/ubicacion";
@@ -54,22 +54,8 @@ export function useObservacion(): Observacion | null {
   return data ? elegirObservacion(data, punto) : null;
 }
 
-/**
- * Frase de hoy y mañana y riesgo de arroyos de las próximas 24 horas, con el umbral elegido en Usuario.
- * Con `umbral: null` (ciudad sin arroyos) no se calcula riesgo. `obs` corrige la frase de la hora
- * en curso (el riesgo de arroyos no se toca: ante la duda, se avisa).
- */
-export function resumenDelDia(
-  p: Pronostico,
-  umbral: { probabilidad: number; mm: number } | null = UMBRAL_ARROYOS,
-  obs: Observacion | null = null,
-) {
-  const horas = proximasHoras(p, 24);
-  return {
-    hoy: horas[0]?.hora.slice(0, 10) ?? "",
-    ahora: horas[0]?.hora,
-    // Hasta 48 horas para alcanzar a cubrir todo mañana.
-    frase: fraseLluvia(proximasHoras(p, 48), obs),
-    arroyos: umbral ? ventanasArroyos(horas, umbral) : [],
-  };
+/** Frase de la lluvia de hoy y mañana. `obs` corrige la de la hora en curso (ver metar.ts). */
+export function resumenDelDia(p: Pronostico, obs: Observacion | null = null) {
+  // Hasta 48 horas para alcanzar a cubrir todo mañana.
+  return { frase: fraseLluvia(proximasHoras(p, 48), obs) };
 }

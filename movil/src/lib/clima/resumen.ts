@@ -1,9 +1,9 @@
-// Frase de resumen de la lluvia y alerta de arroyos (sin React, probado con node:test).
+// Frase de resumen de la lluvia (sin React, probado con node:test).
 
 import type { Observacion } from "./metar.ts";
 import type { Hora, HoraLocal } from "./tipos.ts";
 
-/** Horas seguidas que cumplen una condición (lluvia, arroyos). `hasta` es la hora siguiente a la última. */
+/** Horas seguidas que cumplen una condición (p. ej. lluvia). `hasta` es la hora siguiente a la última. */
 export interface Ventana {
   desde: HoraLocal;
   hasta: HoraLocal;
@@ -189,33 +189,3 @@ function conPunto(t: string): string {
   return t.endsWith(".") ? t : `${t}.`;
 }
 
-// --- Arroyos -----------------------------------------------------------------------
-
-/**
- * Regla provisional, contrastada con 5 días de arroyos reportados por la prensa (ago.–sep. 2026):
- * el modelo subestima los aguaceros (el 20 de sept. marcó 1,3 mm/h), así que además de los
- * milímetros se usa el código de tormenta eléctrica (95–99), que sí aparece esos días.
- * Ver "Alerta de arroyos" en el README principal.
- */
-export const UMBRAL_ARROYOS = { probabilidad: 60, mm: 5 };
-
-export function horaConRiesgo(h: Hora, u = UMBRAL_ARROYOS): boolean {
-  return (h.probabilidad ?? 0) >= u.probabilidad && (h.mm >= u.mm || h.codigo >= 95);
-}
-
-export function ventanasArroyos(horas: Hora[], u = UMBRAL_ARROYOS): Ventana[] {
-  return agrupar(horas, (h) => horaConRiesgo(h, u));
-}
-
-/**
- * "Riesgo de arroyos entre 2 y 4 p. m." (o "a las 3 p. m.", "mañana …").
- * Si empieza en la hora en curso (`ahora`): "Riesgo de arroyos ahora" o "… desde ya y hasta …".
- */
-export function fraseArroyos(v: Ventana, hoy: string, ahora?: HoraLocal): string {
-  if (ahora && v.desde === ahora) {
-    return v.horas.length === 1 ? "Riesgo de arroyos ahora" : `Riesgo de arroyos desde ya y hasta ${hastaLas(v.hasta)}`;
-  }
-  const dia = cuando(v.desde, hoy);
-  const cuandoTexto = v.horas.length === 1 ? aLas(v.desde, true) : rangoHoras(v.desde, v.hasta);
-  return `Riesgo de arroyos ${dia ? `${dia} ` : ""}${cuandoTexto}`;
-}

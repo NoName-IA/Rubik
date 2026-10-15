@@ -1,4 +1,4 @@
-// Notificaciones locales de lluvia, arroyos, mucho calor y aire limpio: se reprograman cada vez que cambia el pronóstico o las
+// Notificaciones locales de lluvia, mucho calor y aire limpio: se reprograman cada vez que cambia el pronóstico o las
 // preferencias, y suenan a su hora aunque la app esté cerrada. En Expo Go Android quedan apagados:
 // desde el SDK 53 importar expo-notifications ahí lanza un error (pide un development build).
 
@@ -11,7 +11,6 @@ import { AppState, Linking, Platform } from "react-native";
 
 import { useAire } from "@/hooks/useAire";
 import { usePronostico } from "@/hooks/usePronostico";
-import { useUmbralArroyos } from "@/hooks/useUmbralArroyos";
 import { type Aviso, planearAvisos, RUTAS_AVISO, type RutaAviso } from "@/lib/avisos";
 
 const CANAL = "avisos";
@@ -68,18 +67,12 @@ async function programar(avisos: Aviso[]) {
  */
 export function useAvisos() {
   const { data } = usePronostico();
-  const umbral = useUmbralArroyos();
   const { data: aire } = useAire();
-
-  // `umbral` es un objeto nuevo en cada render: se compara por sus valores.
-  const probabilidad = umbral?.probabilidad;
-  const mm = umbral?.mm;
 
   useEffect(() => {
     if (!disponible || !data) return;
-    const arroyos = probabilidad !== undefined && mm !== undefined ? { probabilidad, mm } : null;
-    programar(planearAvisos(data, { lluvia: true, arroyos, calor: true, aire: aire ?? null })).catch(() => {});
-  }, [data, probabilidad, mm, aire]);
+    programar(planearAvisos(data, { lluvia: true, calor: true, aire: aire ?? null })).catch(() => {});
+  }, [data, aire]);
 
   const respuesta = useUltimaRespuesta();
   useEffect(() => {

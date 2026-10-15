@@ -6,11 +6,8 @@ import { test } from "node:test";
 import {
   aLas,
   hastaLas,
-  fraseArroyos,
   fraseLluvia,
-  horaConRiesgo,
   rangoHoras,
-  ventanasArroyos,
   ventanasLluvia,
 } from "../src/lib/clima/resumen.ts";
 import type { Observacion } from "../src/lib/clima/metar.ts";
@@ -125,20 +122,6 @@ test("frase: gotas, la hora en curso y varias ventanas", () => {
     assert.ok(!f.includes(".."), f);
 });
 
-test("arroyos: mm fuertes o tormenta, siempre con probabilidad alta", () => {
-  const [a, b, c, d, e] = serie("2026-10-12T14", [[70, 6], [70, 1, 95], [50, 9, 95], [65, 1, 81], [60, 0.2, 99]]);
-  assert.equal(horaConRiesgo(a), true); // 6 mm con 70 %
-  assert.equal(horaConRiesgo(b), true); // tormenta con 70 %
-  assert.equal(horaConRiesgo(c), false); // probabilidad baja
-  assert.equal(horaConRiesgo(d), false); // chubasco débil
-  assert.equal(horaConRiesgo(e), true);
-  const v = ventanasArroyos([a, b, c, d, e]);
-  assert.equal(v.length, 2);
-  assert.equal(fraseArroyos(v[0], "2026-10-12"), "Riesgo de arroyos entre 2 y 4 p. m.");
-  assert.equal(fraseArroyos(v[1], "2026-10-12"), "Riesgo de arroyos a las 6 p. m.");
-  assert.equal(fraseArroyos(v[1], "2026-10-11"), "Riesgo de arroyos mañana a las 6 p. m.");
-  // Si el riesgo empieza en la hora en curso se dice "ahora".
-  assert.equal(fraseArroyos(v[1], "2026-10-12", "2026-10-12T18:00"), "Riesgo de arroyos ahora");
-  assert.equal(fraseArroyos(v[0], "2026-10-12", "2026-10-12T14:00"), "Riesgo de arroyos desde ya y hasta las 4 p. m.");
+test("lluvia que sigue hasta la medianoche", () => {
   assert.equal(fraseLluvia(serie("2026-10-12T22", [[80, 1], [80, 1], [10, 0]])), "Hoy podría llover desde ya hasta la medianoche.");
 });
