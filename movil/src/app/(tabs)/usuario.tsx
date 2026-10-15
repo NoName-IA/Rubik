@@ -16,7 +16,8 @@ import { useUbicacion } from "@/contexto/Ubicacion";
 import { usePermisoAvisos } from "@/hooks/useAvisos";
 import { useIaDesbloqueada } from "@/hooks/useVictoriasRubo";
 import { buscarArea, buscarCiudad, CIUDAD_INICIAL } from "@/lib/ciudades";
-import { espacio, fuente, radio, useColores } from "@/theme";
+import { type Paleta, PALETAS, TEMAS } from "@/lib/temas";
+import { espacio, fuente, radio, useColores, useOscuro } from "@/theme";
 
 const UBICACIONES = [
   { clave: "gps", titulo: "Mi ubicación (GPS)" },
@@ -28,7 +29,7 @@ const RUBOKILL = [
   { clave: "si", titulo: "Activado" },
 ] as const;
 
-const TEMAS = [
+const MODOS = [
   { clave: "sistema", titulo: "Sistema" },
   { clave: "claro", titulo: "Claro" },
   { clave: "oscuro", titulo: "Oscuro" },
@@ -94,7 +95,8 @@ export default function Usuario() {
       ) : null}
 
       <Panel titulo="Tema">
-        <Segmentos opciones={TEMAS} valor={p.tema} alCambiar={(tema) => cambiar({ tema })} dentroDePanel />
+        <MuestrasTema elegida={p.paleta} alElegir={(paleta) => cambiar({ paleta })} />
+        <Segmentos opciones={MODOS} valor={p.tema} alCambiar={(tema) => cambiar({ tema })} dentroDePanel />
       </Panel>
 
       {iaDesbloqueada ? (
@@ -113,6 +115,53 @@ export default function Usuario() {
         <Text style={[styles.nota, { color: c.tinta2 }]}>Versión {Constants.expoConfig?.version ?? "—"}</Text>
       </Panel>
     </Pantalla>
+  );
+}
+
+/**
+ * Los temas de color como muestras: una mini tarjeta con el fondo, el acento y un botón de cada tema
+ * (en el modo claro u oscuro que se esté usando). Tocar una la aplica al instante.
+ */
+function MuestrasTema({ elegida, alElegir }: { elegida: Paleta; alElegir: (p: Paleta) => void }) {
+  const c = useColores();
+  const oscuro = useOscuro();
+  return (
+    <View style={styles.muestras} accessibilityRole="radiogroup">
+      {PALETAS.map((paleta) => {
+        const t = TEMAS[paleta][oscuro ? "oscuro" : "claro"];
+        const activa = paleta === elegida;
+        return (
+          <Presionable
+            key={paleta}
+            onPress={() => alElegir(paleta)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: activa }}
+            accessibilityLabel={`Tema ${TEMAS[paleta].nombre}`}
+            style={styles.muestra}
+          >
+            <View
+              style={[
+                styles.miniatura,
+                { backgroundColor: t.fondo, borderColor: activa ? c.enfasis : c.borde, borderWidth: activa ? 2 : 1 },
+              ]}
+            >
+              <View style={[styles.miniTarjeta, { backgroundColor: t.superficie, borderColor: t.borde }]}>
+                <View style={[styles.miniLinea, { backgroundColor: t.tinta2 }]} />
+                <View style={[styles.miniBoton, { backgroundColor: t.enfasis }]} />
+              </View>
+              {activa ? (
+                <View style={[styles.marca, { backgroundColor: c.enfasis }]}>
+                  <Ionicons name="checkmark" size={12} color={c.sobreEnfasis} />
+                </View>
+              ) : null}
+            </View>
+            <Text style={[styles.nombreTema, { color: activa ? c.tinta : c.tinta2 }]} numberOfLines={1}>
+              {TEMAS[paleta].nombre}
+            </Text>
+          </Presionable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -166,4 +215,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radio.s,
   },
+  // Muestras de tema: 5 en una fila (si no caben, bajan a la siguiente).
+  muestras: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: espacio.m },
+  muestra: { width: 56, alignItems: "center", gap: espacio.xs },
+  miniatura: { width: 52, height: 64, borderRadius: radio.s, padding: 6, justifyContent: "flex-end" },
+  miniTarjeta: { borderRadius: 4, borderWidth: 1, padding: 4, gap: 4 },
+  miniLinea: { height: 3, width: "70%", borderRadius: 2 },
+  miniBoton: { height: 8, borderRadius: 3 },
+  marca: { position: "absolute", top: 4, right: 4, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  nombreTema: { fontSize: 11 },
 });

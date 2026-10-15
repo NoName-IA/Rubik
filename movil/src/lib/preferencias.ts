@@ -1,6 +1,7 @@
 // Preferencias del usuario, guardadas solo en el celular (sin React, probado con node:test).
 
 import { CIUDAD_INICIAL, buscarCiudad } from "./ciudades.ts";
+import { type Paleta, PALETAS } from "./temas.ts";
 
 export type Tema = "sistema" | "claro" | "oscuro";
 /** "gps": la posición del celular; "ciudad": la ciudad elegida en `ciudad`. */
@@ -12,6 +13,8 @@ export interface Preferencias {
   /** id de `CIUDADES` (se usa con `ubicacion: "ciudad"` y si no hay GPS). */
   ciudad: string;
   tema: Tema;
+  /** Tema de color (ver lib/temas.ts). */
+  paleta: Paleta;
   /** RuboKill: al perder contra la IA en el Rubo, la foto de Rubo en toda la pantalla. Apagado al empezar. */
   rubokill: boolean;
 }
@@ -21,6 +24,7 @@ export const PREFERENCIAS_INICIALES: Preferencias = {
   ubicacion: "gps",
   ciudad: CIUDAD_INICIAL.id,
   tema: "sistema",
+  paleta: "violeta",
   rubokill: false,
 };
 
@@ -47,6 +51,7 @@ export function leerPreferencias(texto: string | null): Preferencias {
     ubicacion: antigua ? "ciudad" : uno(g.ubicacion, ["gps", "ciudad"] as const, "gps"),
     ciudad: antigua ? "barranquilla" : ciudad,
     tema: uno(g.tema, ["sistema", "claro", "oscuro"] as const, "sistema"),
+    paleta: uno(g.paleta, PALETAS, "violeta"),
     rubokill: g.rubokill === true,
   };
 }

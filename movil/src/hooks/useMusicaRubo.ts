@@ -11,8 +11,8 @@ import type { Fase } from "@/lib/pong";
 
 const FASE_1 = require("../../assets/sonidos/fase-1.mp3");
 /**
- * Modo arcade: en cada partida suena en bucle una de estas, al azar (nunca la misma dos veces seguidas).
- * Se cargan de a una en el mismo reproductor, no todas a la vez.
+ * Modo arcade: en cada partida empieza una de estas al azar y, cuando se acaba, sigue otra al azar
+ * (nunca la misma dos veces seguidas). Se cargan de a una en el mismo reproductor, no todas a la vez.
  */
 const CANCIONES_ARCADE = [
   require("../../assets/sonidos/arcade/choral-chambers.mp3"),
@@ -22,8 +22,8 @@ const CANCIONES_ARCADE = [
   require("../../assets/sonidos/arcade/zelda-hyrule-field.mp3"),
 ];
 const FASE_2 = require("../../assets/sonidos/fase-2.mp3");
-/** Las fases 3 y 4 comparten canción: al pasar a la 4 sigue donde iba. */
-const FASE_3_4 = require("../../assets/sonidos/fase-3-4.mp3");
+const FASE_3 = require("../../assets/sonidos/fase-3.mp3");
+const FASE_4 = require("../../assets/sonidos/fase-4.mp3");
 /**
  * La voz de cada frase (`voz` en FRASES_RUBO, src/lib/dialogo.ts): un bip por letra, en silencio en
  * los espacios y en los puntos suspensivos. Dura justo lo que tarda en escribirse y se calla sola. Ver
@@ -41,7 +41,7 @@ const GLITCH = require("../../assets/sonidos/glitch.wav");
 const GOL = require("../../assets/sonidos/gol.wav");
 const PERDIDA = require("../../assets/sonidos/perdida.wav");
 /** Volumen de cada canción: la de la fase 1 viene más bajita, así que va al máximo. */
-const VOLUMEN_MUSICA: Record<Fase, number> = { 1: 1, 2: 0.7, 3: 0.7, 4: 0.7 };
+const VOLUMEN_MUSICA: Record<Fase, number> = { 1: 1, 2: 0.7, 3: 0.7, 4: 1 };
 /** La canción del arcade viene bajita: al máximo. */
 const VOLUMEN_ARCADE = 1;
 /** La última canción del arcade que sonó (en toda la sesión, para no repetirla en la partida siguiente). */
@@ -55,11 +55,11 @@ const ESCALA_GLITCH = 0.6;
 
 export interface MusicaRubo {
   /**
-   * Toca la canción de la fase y calla lo demás. Si es la misma canción que venía sonando (de la 3 a la
-   * 4), sigue donde iba; con `desdeElPrincipio` (partida nueva) siempre empieza de cero.
+   * Toca la canción de la fase y calla lo demás. Si es la misma canción que venía sonando, sigue donde
+   * iba; con `desdeElPrincipio` (partida nueva) siempre empieza de cero.
    */
   tocar: (fase: Fase, desdeElPrincipio?: boolean) => void;
-  /** Una canción del arcade al azar (distinta de la anterior), desde el principio. */
+  /** Una canción del arcade al azar (distinta de la anterior), desde el principio; al acabar, sigue otra. */
   tocarArcade: () => void;
   /** Corta la música y suena una sola vez la voz `n` (1 a 4). */
   hablar: (n: number) => void;
@@ -79,7 +79,8 @@ export function useMusicaRubo(): MusicaRubo {
   const cancion1 = useAudioPlayer(FASE_1);
   const cancionArcade = useAudioPlayer(CANCIONES_ARCADE[0]);
   const cancion2 = useAudioPlayer(FASE_2);
-  const cancion34 = useAudioPlayer(FASE_3_4);
+  const cancion3 = useAudioPlayer(FASE_3);
+  const cancion4 = useAudioPlayer(FASE_4);
   const voz1 = useAudioPlayer(VOCES[0]);
   const voz2 = useAudioPlayer(VOCES[1]);
   const voz3 = useAudioPlayer(VOCES[2]);
@@ -95,7 +96,7 @@ export function useMusicaRubo(): MusicaRubo {
   const perdida = useAudioPlayer(PERDIDA);
 
   const control = useMemo(() => {
-    const canciones: Record<Fase, AudioPlayer> = { 1: cancion1, 2: cancion2, 3: cancion34, 4: cancion34 };
+    const canciones: Record<Fase, AudioPlayer> = { 1: cancion1, 2: cancion2, 3: cancion3, 4: cancion4 };
     const voces = [voz1, voz2, voz3, voz4];
     const golpes = { jugador: [jugadorA, jugadorB], maquina: [maquinaA, maquinaB] };
     const glitches = [glitchA, glitchB];
@@ -132,7 +133,7 @@ export function useMusicaRubo(): MusicaRubo {
     // Se pausan todos siempre: `playing` se actualiza con retraso y no sirve para saber qué suena.
     const callar = () =>
       seguro(() => {
-        for (const p of [cancion1, cancion2, cancion34, cancionArcade, ...voces]) p.pause();
+        for (const p of [cancion1, cancion2, cancion3, cancion4, cancionArcade, ...voces]) p.pause();
       });
     const efecto = (p: AudioPlayer, volumen: number) =>
       !ahora.enPausa &&
@@ -145,7 +146,8 @@ export function useMusicaRubo(): MusicaRubo {
     const cancion = (p: AudioPlayer, volumen: number, desdeElPrincipio: boolean, recienCambiada = false) => {
       callar();
       seguro(() => {
-        p.loop = true;
+        // Las de las fases se repiten; las del arcade no: al terminar pasa a otra (ver `siguienteArcade`).
+        p.loop = p !== cancionArcade;
         p.volume = volumen;
         if (desdeElPrincipio || p !== ahora.cancion) p.seekTo(0).catch(() => {});
         if (!ahora.enPausa) p.play();
@@ -162,17 +164,22 @@ export function useMusicaRubo(): MusicaRubo {
         }
       });
     };
+    const tocarArcade = () => {
+      const otras = CANCIONES_ARCADE.map((_, i) => i).filter((i) => i !== ultimaArcade);
+      const n = otras[Math.floor(Math.random() * otras.length)];
+      ultimaArcade = n;
+      // Si el reproductor ya tiene cargada esa, no hace falta cambiarla.
+      const cambia = n !== ahora.cargadaArcade;
+      ahora.cargadaArcade = n;
+      if (cambia) seguro(() => cancionArcade.replace(CANCIONES_ARCADE[n]));
+      cancion(cancionArcade, VOLUMEN_ARCADE, true, cambia);
+    };
     return {
       tocar: (fase: Fase, desdeElPrincipio = false) => cancion(canciones[fase], VOLUMEN_MUSICA[fase], desdeElPrincipio),
-      tocarArcade: () => {
-        const otras = CANCIONES_ARCADE.map((_, i) => i).filter((i) => i !== ultimaArcade);
-        const n = otras[Math.floor(Math.random() * otras.length)];
-        ultimaArcade = n;
-        // Si el reproductor ya tiene cargada esa, no hace falta cambiarla.
-        const cambia = n !== ahora.cargadaArcade;
-        ahora.cargadaArcade = n;
-        if (cambia) seguro(() => cancionArcade.replace(CANCIONES_ARCADE[n]));
-        cancion(cancionArcade, VOLUMEN_ARCADE, true, cambia);
+      tocarArcade,
+      /** Terminó la canción del arcade: si sigue siendo la que toca, pasa a otra al azar. */
+      siguienteArcade: () => {
+        if (ahora.vivo && ahora.sonando === cancionArcade) tocarArcade();
       },
       hablar: (n: number) => {
         callar();
@@ -213,7 +220,8 @@ export function useMusicaRubo(): MusicaRubo {
     cancion1,
     cancionArcade,
     cancion2,
-    cancion34,
+    cancion3,
+    cancion4,
     voz1,
     voz2,
     voz3,
@@ -227,6 +235,14 @@ export function useMusicaRubo(): MusicaRubo {
     gol,
     perdida,
   ]);
+
+  // Arcade: cuando una canción se acaba, suena otra al azar (distinta).
+  useEffect(() => {
+    const sub = cancionArcade.addListener("playbackStatusUpdate", (estado) => {
+      if (estado.didJustFinish) control.siguienteArcade();
+    });
+    return () => sub.remove();
+  }, [cancionArcade, control]);
 
   // En segundo plano no suena nada; al volver sigue la canción donde iba.
   useEffect(() => {

@@ -43,6 +43,7 @@ import {
   ganador,
   GOLES_FASE_2,
   GOLES_FASE_3,
+  GOLES_FASE_4,
   CORAZONES_JUGADOR,
   GOLES_IA,
   MARGEN,
@@ -648,6 +649,24 @@ function Juego({
       );
       latido.start();
     };
+    /**
+     * Tu 6.º gol (fase 4, le queda un corazón): Rubo se desata. Su halo late el doble de rápido y su
+     * barra tiembla sin parar.
+     */
+    const desatar = () => {
+      if (movimientoReducido()) return;
+      latido?.stop();
+      quejido?.stop();
+      latido = Animated.loop(
+        Animated.sequence([
+          Animated.timing(furia, { toValue: 1, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVO }),
+          Animated.timing(furia, { toValue: 0, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVO }),
+        ]),
+      );
+      latido.start();
+      quejido = Animated.loop(Animated.sequence([sacudir([0.5, -0.5, 0.35, -0.35, 0.2, -0.2, 0], 40), Animated.delay(120)]));
+      quejido.start();
+    };
     /** `pierdes`: es el punto con el que la IA gana la partida (solo ahí sale RuboKill). */
     const fallar = (nivel: number, pierdes: boolean) => {
       if (movimientoReducido()) return;
@@ -724,6 +743,7 @@ function Juego({
           setFrase({ goles: s.puntos.jugador, frases: dice });
           if (s.puntos.jugador === GOLES_FASE_2) herir();
           if (s.puntos.jugador === GOLES_FASE_3) enfurecer();
+          if (s.puntos.jugador === GOLES_FASE_4) desatar();
         }
         // Un nivel por encima del marcador: el primer punto ya trae 2 ráfagas, el segundo 3, y del tercero
         // en adelante 4 (la partida llega a 7 y más serían eternas).
@@ -799,15 +819,25 @@ function Juego({
   // líneas, su marcador, un rojo que respira sobre la cancha y una viñeta roja en toda la pantalla; tu
   // barra se apaga un poco.
   const fase3 = ia && estado !== null && faseRubo(estado) >= 3;
+  // Fase 4 (le queda un corazón): toda la pantalla se va a negro y solo brilla Rubo.
+  const fase4 = ia && estado !== null && faseRubo(estado) === 4;
+  // En la fase 4 el título del encabezado va blanco (en modo claro es oscuro y sobre el negro no se vería).
+  useLayoutEffect(() => {
+    if (!fase4) return;
+    const estilo = (color: string) => ({ headerTitleStyle: { fontFamily: fuente.titulo, color, fontSize: 20 } });
+    navegacion.setOptions(estilo("#FFFFFF"));
+    return () => navegacion.setOptions(estilo(c.tinta));
+  }, [fase4, navegacion, c.tinta]);
   // Arcade: la cancha es una cueva oscura (igual en modo claro y oscuro), con colores fijos que se ven sobre ella.
   const enCueva = nivel === "arcade";
   const colores = {
-    fondo: enCueva ? COLORES_CUEVA.fondoAbajo : ia ? c.peligroSuave : c.superficie,
+    fondo: enCueva ? COLORES_CUEVA.fondoAbajo : fase4 ? "#000000" : ia ? c.peligroSuave : c.superficie,
     borde: enCueva ? `${COLORES_CUEVA.filo}80` : fase3 ? c.peligro : ia ? `${c.peligro}66` : c.borde,
     trazos: enCueva ? "#FFFFFF33" : fase3 ? `${c.peligro}80` : ia ? `${c.peligro}40` : c.borde,
     maquina: enCueva ? COLORES_CUEVA.cristal2 : ia ? c.peligro : c.tinta2,
     jugador: enCueva ? COLORES_CUEVA.cristal : c.enfasis,
-    bola: enCueva ? "#FFFFFF" : c.tinta,
+    // Sobre el negro de la fase 4 la bola va blanca (en modo claro la tinta es oscura y no se vería).
+    bola: enCueva || fase4 ? "#FFFFFF" : c.tinta,
   };
 
   // Tamaño de la cancha: 1,85 veces más alta que ancha, lo más grande que quepa dejando libre la
@@ -871,6 +901,9 @@ function Juego({
         />
       ) : null}
 
+      {/* Fase 4: todo se funde a negro, también el rojo de atrás; quedan Rubo, la bola y los corazones. */}
+      {fase4 ? <Oscuridad /> : null}
+
       {/* Arcade: arriba el nivel y el récord, en letra de 8 bits. */}
       {arcade && estado ? (
         <View pointerEvents="none" style={[styles.marcadorArcade, { top: altoEncabezado + espacio.s }]}>
@@ -886,7 +919,7 @@ function Juego({
             quien="Rubo"
             total={GOLES_IA}
             rotos={estado.puntos.jugador}
-            color={fase3 ? "#000000" : c.peligro}
+            color={fase3 && !fase4 ? "#000000" : c.peligro}
             posicion={{ top: altoEncabezado + espacio.s }}
           />
           <Corazones
@@ -897,6 +930,18 @@ function Juego({
             posicion={{ bottom: relleno.abajo + espacio.m }}
           />
         </>
+      ) : null}
+
+      {/* RuboKill activado (solo cambia el modo IA): una calavera abajo a la derecha, fuera de la cancha. */}
+      {ia && rubokill ? (
+        <View
+          pointerEvents="none"
+          style={[styles.calavera, { bottom: relleno.abajo + espacio.m }]}
+          accessible
+          accessibilityLabel="RuboKill activado"
+        >
+          <Ionicons name="skull" size={28} color={c.peligro} />
+        </View>
       ) : null}
 
       {area ? (
@@ -918,7 +963,7 @@ function Juego({
           >
             {tam && estado ? (
               <>
-                {fase3 ? (
+                {fase3 && !fase4 ? (
                   <Animated.View
                     pointerEvents="none"
                     style={[
@@ -948,6 +993,7 @@ function Juego({
                   ancho={tam.ancho}
                   color={colores.maquina}
                   brillo={ia}
+                  rabia={fase4}
                   golpe={golpe}
                   furia={furia}
                   dolor={dolor}
@@ -1390,6 +1436,17 @@ const FondoCueva = memo(function FondoCueva({ ancho, alto }: { ancho: number; al
   );
 });
 
+/** Fase 4: un negro que tapa toda la pantalla del juego (también el rojo), apareciendo en casi un segundo. */
+function Oscuridad() {
+  const [opacidad] = useState(() => new Animated.Value(movimientoReducido() ? 1 : 0));
+  useEffect(() => {
+    const a = Animated.timing(opacidad, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: NATIVO });
+    a.start();
+    return () => a.stop();
+  }, [opacidad]);
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: "#000000", opacity: opacidad }]} />;
+}
+
 /**
  * Fondo de toda la pantalla del arcade, detrás de la cancha: otra cueva (con otra semilla) dibujada solo
  * con líneas tenues del color de la letra, sin rellenos ni colores: el filo de la roca más marcado y las
@@ -1432,6 +1489,7 @@ const Barra = memo(function Barra({
   ancho,
   color,
   brillo = false,
+  rabia = false,
   golpe,
   furia,
   dolor,
@@ -1443,6 +1501,8 @@ const Barra = memo(function Barra({
   ancho: number;
   color: string;
   brillo?: boolean;
+  /** Fase 4: brilla mucho más (halo grande y núcleo blanco que late). */
+  rabia?: boolean;
   golpe?: Animated.Value;
   furia?: Animated.Value;
   /** 0 → 1 → 0 al empezar la fase 2: destella en blanco, se aplasta y salta hacia atrás. */
@@ -1483,6 +1543,34 @@ const Barra = memo(function Barra({
           ],
         }}
       >
+        {rabia ? (
+          <>
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: -26,
+                top: -22,
+                right: -26,
+                bottom: -22,
+                borderRadius: grosor / 2 + 24,
+                backgroundColor: color,
+                opacity: halo(0.12, 0.3),
+              }}
+            />
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: -14,
+                top: -12,
+                right: -14,
+                bottom: -12,
+                borderRadius: grosor / 2 + 13,
+                backgroundColor: color,
+                opacity: halo(0.25, 0.55),
+              }}
+            />
+          </>
+        ) : null}
         {brillo ? (
           <>
             <Animated.View
@@ -1512,6 +1600,21 @@ const Barra = memo(function Barra({
           </>
         ) : null}
         <View style={{ flex: 1, borderRadius: grosor / 2, backgroundColor: color }} />
+        {rabia ? (
+          // Núcleo al rojo blanco, que late con el halo.
+          <Animated.View
+            style={{
+              position: "absolute",
+              left: grosor,
+              right: grosor,
+              top: grosor * 0.3,
+              bottom: grosor * 0.3,
+              borderRadius: grosor,
+              backgroundColor: "#FFFFFF",
+              opacity: halo(0.45, 0.95),
+            }}
+          />
+        ) : null}
         {dolor ? (
           <Animated.View
             style={[
@@ -2082,6 +2185,7 @@ const styles = StyleSheet.create({
   botonesPausa: { alignSelf: "stretch", gap: espacio.m, paddingHorizontal: espacio.xl, minWidth: 240 },
   juego: { flex: 1, paddingHorizontal: espacio.l },
   contenedorCancha: { alignSelf: "center" },
+  calavera: { position: "absolute", right: espacio.l },
   marcadorArcade: {
     position: "absolute",
     left: espacio.l,

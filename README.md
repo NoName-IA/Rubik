@@ -18,7 +18,7 @@ Rubik/
 | **Inicio** | Resumen del día (clima, lluvia, aire, último titular) y carrusel de accesos rápidos |
 | **Clima** | **Hoy**, **Lluvia** (gráfica de 48 h) y **7 días**; frase de resumen ("Hoy podría llover entre 2 y 5 p. m.") y calidad del aire |
 | **Dólar** | TRM oficial de hoy, su evolución (30 días, 90 días, 1 año) y un conversor |
-| **Usuario** | Nombre del saludo, ubicación (GPS o ciudad y municipio), permiso de notificaciones, tema y, cuando se desbloquea, **RuboKill** |
+| **Usuario** | Nombre del saludo, ubicación (GPS o ciudad y municipio), permiso de notificaciones, **tema** (5 paletas de color —Violeta, Océano, Bosque, Atardecer y Rosa— y modo Sistema/Claro/Oscuro) y, cuando se desbloquea, **RuboKill** |
 
 Desde los accesos rápidos de Inicio se abren:
 
@@ -49,7 +49,7 @@ salir de la app): congela el juego y la música y muestra **Continuar**, **Reini
   luz violeta, estalactitas, rayos de luz, cristales violeta y fucsia, motas flotando); detrás, en
   toda la pantalla, otra cueva igual pero solo en líneas, sin color (`lib/cueva.ts`). Cada gol tuyo sube el nivel (arriba, en letra de 8 bits, el
   nivel y tu récord): la máquina se mueve más rápido, falla menos y la bola corre más, hasta el nivel
-  16, donde todavía falla de vez en cuando. En cada partida suena en bucle una canción al azar de `assets/sonidos/arcade/` (nunca la misma dos veces seguidas) y se guarda tu récord de
+  16, donde todavía falla de vez en cuando. En cada partida suena una canción al azar de `assets/sonidos/arcade/` y, cuando se acaba, sigue otra al azar (nunca la misma dos veces seguidas) y se guarda tu récord de
   goles en una partida. Los goles suenan como en normal.
 - **IA**: empieza **encadenado**. Se desbloquea al ganar 2 veces en normal; entonces las cadenas
   vibran y al tocarlas se rompen. Rubo tiene **7 corazones** de 8 bits arriba de la cancha (negros
@@ -61,13 +61,14 @@ salir de la app): congela el juego y la música y muestra **Continuar**, **Reini
   3. **Desde el 4.º gol**: "¡¡Sal de aquí!!". Se pone durísimo: casi siempre ataca lejos de tu barra
      y la bola se acelera, pero a veces se descuida. El fondo se tiñe de rojo y todo late con él.
   4. **Con el 6.º gol** (le queda un corazón): "¿Así que así será?.." y, 2 segundos después,
-     "Bueno...". Se vuelve **invencible**: no falla nunca y el último corazón no se rompe.
+     "Bueno...". Se vuelve **invencible**: no falla nunca y el último corazón no se rompe. Toda la pantalla
+     se funde a negro (también el rojo de atrás) y solo brilla Rubo: halo rojo enorme, núcleo al rojo
+     blanco, latido rápido y un temblor que no para.
 
   Cada gol de la máquina hace fallar la pantalla (glitches), un poco más con cada uno hasta el
   tercero.
 
-  **Música**: una canción para la fase 1, otra para la 2 y otra para las fases 3 y 4 (al pasar a la 4
-  sigue donde iba). Cuando Rubo habla, la música se corta y aparece un cuadro de diálogo en 8 bits
+  **Música**: cada fase (1, 2, 3 y 4) tiene su propia canción. Cuando Rubo habla, la música se corta y aparece un cuadro de diálogo en 8 bits
   (letra pixelada) que Rubo escribe letra por letra con su "voz": un bip por letra, callado en los
   espacios y en los puntos suspensivos, que se escriben despacio (al menos 1 segundo de silencio).
   Al terminar de escribir entra la canción de la fase nueva. Al terminar la partida se calla.
@@ -79,7 +80,8 @@ salir de la app): congela el juego y la música y muestra **Continuar**, **Reini
   inaudible sin él (sube un poco con cada gol, como la falla).
 - **RuboKill** (en Usuario, apagado por defecto; solo aparece con la IA desbloqueada): en la IA la
   bola va al doble de velocidad, los glitches son fuertes y, al perder, la pantalla se pone negra y
-  aparece Rubo. No cambia el modo normal.
+  aparece Rubo. No cambia el modo normal. Mientras está activado, en el modo IA se ve una calavera
+  abajo a la derecha, fuera de la cancha.
 
 ## Fuentes de datos
 

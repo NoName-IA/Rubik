@@ -6,10 +6,12 @@ lógica propia: ver el [README principal](../README.md).
 
 ## Estilo visual
 
-Tomado de `portfolio_web` (VSCODEX): fondo índigo liso `#0F0D29`, acento violeta `#A78BFA`
-(`#7C3AED` en modo claro), títulos en **Space Grotesk** y texto en **Inter**, tarjetas con borde
-violeta tenue y esquinas de 16. Modo claro y oscuro (o el del sistema), con contrastes de texto
-≥ 4,5:1. Todo está en `src/theme.ts`; los textos usan `src/components/Texto.tsx`, que elige la
+Tomado de `portfolio_web` (VSCODEX): fondo liso, un color de acento, títulos en **Space Grotesk** y
+texto en **Inter**, tarjetas con borde tenue y esquinas de 16. Los colores salen del **tema** elegido
+en Usuario (`src/lib/temas.ts`): Violeta (el original: índigo `#0F0D29` y violeta `#A78BFA`), Océano,
+Bosque, Atardecer y Rosa, cada uno en modo claro y oscuro (o el del sistema). Una prueba comprueba que
+en todos los textos tienen contraste ≥ 4,5:1. Para agregar un tema, se suma una entrada a `TEMAS`.
+Medidas y fuentes en `src/theme.ts`; los textos usan `src/components/Texto.tsx`, que elige la
 variante de Inter según el grosor.
 
 - **Navbar** (`src/components/BarraLiquida.tsx`): una "gota" se desliza a la pestaña elegida
@@ -90,6 +92,7 @@ src/
 │   ├── pong.ts               # física del Rubo y cómo juega la máquina en cada nivel y fase
 │   ├── dialogo.ts            # frases de Rubo y el tiempo de cada letra
 │   ├── cueva.ts              # fondo de cueva de la cancha del arcade
+│   ├── temas.ts              # paletas de color de cada tema (claro y oscuro)
 │   ├── avisos.ts dolar.ts preferencias.ts ubicacion.ts http.ts …
 │   └── accesos.ts            # ← para agregar un acceso rápido, se edita esta lista
 └── theme.ts                  # colores claro/oscuro, fuentes y medidas
