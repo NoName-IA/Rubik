@@ -37,12 +37,24 @@ municipios cercanos (Soledad, Turbaco, Ciénaga, Soacha, Tocancipá, Bello, Flor
 ### Rubo
 
 Pong vertical: tu barra abajo (la mueves con el dedo), la de la máquina arriba. Gana quien llegue
-primero a **3** (en la IA, a **7**). Al terminar se ve el resultado y una rueda para jugar de nuevo.
+primero a **3** (en la IA, tú necesitas **7** y Rubo **3**). Al terminar se ve el resultado y una rueda para jugar de nuevo.
+Durante la partida, arriba a la izquierda va el botón de **pausa** (también "atrás" del celular, o
+salir de la app): congela el juego y la música y muestra **Continuar**, **Reiniciar** (partida nueva) y **Salir**
+(al menú).
 
 - **Normal**: la máquina falla de vez en cuando.
+- **Arcade**: se puede elegir, pero el botón Jugar no funciona hasta que entres a jugar el modo IA
+  por primera vez (aunque pierdas). Es infinito, nadie gana. La cancha es el interior de una cueva
+  low-poly al estilo de Geometry Dash, con los colores de la app (roca índigo facetada con un filo de
+  luz violeta, estalactitas, rayos de luz, cristales violeta y fucsia, motas flotando); detrás, en
+  toda la pantalla, otra cueva igual pero solo en líneas, sin color (`lib/cueva.ts`). Cada gol tuyo sube el nivel (arriba, en letra de 8 bits, el
+  nivel y tu récord): la máquina se mueve más rápido, falla menos y la bola corre más, hasta el nivel
+  16, donde todavía falla de vez en cuando. En cada partida suena en bucle una canción al azar de `assets/sonidos/arcade/` (nunca la misma dos veces seguidas) y se guarda tu récord de
+  goles en una partida. Los goles suenan como en normal.
 - **IA**: empieza **encadenado**. Se desbloquea al ganar 2 veces en normal; entonces las cadenas
-  vibran y al tocarlas se rompen. Rubo tiene **7 corazones** de 8 bits arriba de la cancha: cada gol
-  tuyo rompe uno (salta, tiembla, se parte y las mitades caen). Tiene cuatro fases según tus goles:
+  vibran y al tocarlas se rompen. Rubo tiene **7 corazones** de 8 bits arriba de la cancha (negros
+  cuando el fondo se pone rojo) y tú **3** abajo: cada gol rompe uno del otro (salta, tiembla, se
+  parte y las mitades caen). Rubo tiene cuatro fases según tus goles:
   1. **0 y 1 gol**: juega como en normal.
   2. **Desde el 2.º gol**: "¿Crees que puedes ganarme? -ja". Le dolió el golpe (su barra queda
      herida) y juega mejor, pero todavía se le hacen goles.
@@ -54,13 +66,15 @@ primero a **3** (en la IA, a **7**). Al terminar se ve el resultado y una rueda 
   Cada gol de la máquina hace fallar la pantalla (glitches), un poco más con cada uno hasta el
   tercero.
 
-  **Música**: una canción para la fase 1, otra para las fases 2 y 3 (al pasar a la 3 sigue donde iba)
-  y otra para la 4. Cuando Rubo habla, la música se corta y aparece un cuadro de diálogo en 8 bits
+  **Música**: una canción para la fase 1, otra para la 2 y otra para las fases 3 y 4 (al pasar a la 4
+  sigue donde iba). Cuando Rubo habla, la música se corta y aparece un cuadro de diálogo en 8 bits
   (letra pixelada) que Rubo escribe letra por letra con su "voz": un bip por letra, callado en los
   espacios y en los puntos suspensivos, que se escriben despacio (al menos 1 segundo de silencio).
   Al terminar de escribir entra la canción de la fase nueva. Al terminar la partida se calla.
 - **Golpe**: en los dos modos, cada vez que la bola pega en una barra suena un bip 8-bit (agudo en la
   tuya, grave en la de Rubo).
+- **Goles en normal**: si anotas suenan cuatro notas que suben; si te anotan, un sonido de pérdida
+  (notas que bajan y la última se arrastra). En la IA los goles no tienen sonido propio.
 - **Glitches**: cada ráfaga suena con estática digital entrecortada; fuerte con RuboKill y casi
   inaudible sin él (sube un poco con cada gol, como la falla).
 - **RuboKill** (en Usuario, apagado por defecto; solo aparece con la IA desbloqueada): en la IA la
@@ -155,6 +169,6 @@ En resumen:
 
 Este resumen es solo orientativo; el texto legal válido es el del archivo [`LICENSE`](LICENSE).
 
-Las canciones de `movil/assets/sonidos/fase-*.mp3` no son parte de este proyecto ni de su licencia:
-pertenecen a sus autores. La voz de Rubo, los golpes y la estática (`voz-*.wav`, `golpe-*.wav`, `glitch.wav`) sí son propios:
+Las canciones de `movil/assets/sonidos/` (`fase-*.mp3` y las de `arcade/`) no son parte de este proyecto ni de su licencia:
+pertenecen a sus autores. La voz de Rubo, los golpes y la estática (`voz-*.wav`, `golpe-*.wav`, `glitch.wav`, `gol.wav`, `perdida.wav`) sí son propios:
 los generan `movil/scripts/generar-voces.ts` y `movil/scripts/generar-sonidos.py`.

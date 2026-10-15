@@ -11,6 +11,7 @@ import {
   caraMaquina,
   type Estado,
   CORAZONES_JUGADOR,
+  DT_MAXIMO,
   faseRubo,
   ganador,
   GOLES_IA,
@@ -18,6 +19,7 @@ import {
   IA_PICADA,
   MAQUINA,
   type Nivel,
+  NIVEL_ARCADE_MAXIMO,
   nuevoJuego,
   objetivoMaquina,
   perfil,
@@ -295,4 +297,61 @@ test("con rapidez 2 (RuboKill) la bola recorre el doble en el mismo tiempo", () 
   const doble = avanzar(jugando(nuevoJuego(ALTO, "normal", 2), bola), DT, 0.5);
   assert.ok(Math.abs(doble.bola.y - 0.6 - 2 * (normal.bola.y - 0.6)) < 1e-9);
   assert.equal(doble.jugador, 0.5, "tu barra sigue al dedo igual");
+});
+
+test("arcade: nunca termina, aunque alguien lleve muchos goles", () => {
+  const golDeRubo = {
+    ...jugando({ ...nuevoJuego(ALTO, "arcade"), puntos: { jugador: 40, maquina: 99 } }, { x: 0.05, y: ALTO - 0.01, vx: 0, vy: 1 }),
+    jugador: 0.9,
+  };
+  const d = avanzar(golDeRubo, 0.05, null);
+  assert.deepEqual(d.puntos, { jugador: 40, maquina: 100 });
+  assert.equal(d.fase, "saque");
+  assert.equal(ganador(d), null);
+});
+
+test("arcade: cada gol tuyo sube el nivel hasta un techo, sin fases de la IA", () => {
+  const p = (jugador: number) => perfil({ nivel: "arcade", puntos: { jugador, maquina: 0 } });
+  assert.deepEqual(p(0), MAQUINA.normal, "el nivel 1 es como el modo normal");
+  for (let g = 1; g < NIVEL_ARCADE_MAXIMO; g++) {
+    assert.ok(p(g).velocidad > p(g - 1).velocidad && p(g).error < p(g - 1).error, `nivel ${g + 1} más difícil`);
+  }
+  assert.equal(p(NIVEL_ARCADE_MAXIMO + 20), p(NIVEL_ARCADE_MAXIMO - 1), "del techo no pasa");
+  assert.ok(p(100).error > 0.237, "en el techo todavía puede fallar");
+  assert.equal(faseRubo({ nivel: "arcade", puntos: { jugador: 6, maquina: 0 } }), 1);
+});
+
+test("partidas simuladas: en el techo del arcade la máquina todavía falla", () => {
+  const azar = azarFijo(7);
+  const azarJugador = azarFijo(70);
+  let e: Estado = { ...nuevoJuego(ALTO, "arcade"), puntos: { jugador: 50, maquina: 0 } };
+  let corrimiento = 0;
+  for (let i = 0; i < 60 * 60 * 10; i++) {
+    if (e.bola.vy < 0) corrimiento = (azarJugador() * 2 - 1) * 0.17;
+    if (e.fase === "saque") e = sacarYa(e, azar);
+    e = avanzar(e, DT, e.bola.x - corrimiento, azar);
+  }
+  assert.ok(e.puntos.jugador >= 55, `en 10 minutos el jugador perfecto le mete goles: ${JSON.stringify(e.puntos)}`);
+  assert.equal(e.fase === "fin", false);
+});
+
+test("si el celular se traba, la bola no salta: avanza como mucho DT_MAXIMO", () => {
+  const e = jugando(nuevoJuego(ALTO, "normal"), { x: 0.5, y: 0.8, vx: 0, vy: 0.5 });
+  const trabado = avanzar(e, 1, 0.5);
+  const tope = avanzar(e, DT_MAXIMO, 0.5);
+  assert.equal(trabado.bola.y, tope.bola.y);
+  assert.ok(Math.abs(trabado.bola.y - 0.8 - 0.5 * DT_MAXIMO) < 1e-9);
+});
+
+test("partidas rápidas (IA con RuboKill, cuadros irregulares): la bola nunca se sale por los lados", () => {
+  const azar = azarFijo(3);
+  let e = nuevoJuego(ALTO, "ia", 2);
+  for (let i = 0; i < 60 * 60 * 3; i++) {
+    if (e.fase === "saque") e = sacarYa(e, azar);
+    if (e.fase === "fin") e = nuevoJuego(ALTO, "ia", 2);
+    // Cuadros de 8 a 70 ms, como un celular que a ratos se traba.
+    e = avanzar(e, 0.008 + azar() * 0.062, azar(), azar);
+    assert.ok(e.bola.x >= BOLA_RADIO - 1e-9 && e.bola.x <= 1 - BOLA_RADIO + 1e-9, `x fuera: ${e.bola.x}`);
+    assert.ok(Number.isFinite(e.bola.y) && Number.isFinite(e.bola.vx) && Number.isFinite(e.bola.vy));
+  }
 });

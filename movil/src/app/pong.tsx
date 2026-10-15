@@ -4,10 +4,12 @@
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "expo-router";
 import { useHeaderHeight, usePreventRemove } from "expo-router/react-navigation";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   type GestureResponderEvent,
   Image,
@@ -17,7 +19,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Pattern, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Pattern, Polygon, Polyline, RadialGradient, Rect, Stop } from "react-native-svg";
 
 import { Entrada, movimientoReducido, Presionable } from "@/components/Movimiento";
 import { Panel } from "@/components/Panel";
@@ -25,6 +27,7 @@ import { Segmentos } from "@/components/Segmentos";
 import { Text } from "@/components/Texto";
 import { usePreferencias } from "@/contexto/Preferencias";
 import { type MusicaRubo, useMusicaRubo } from "@/hooks/useMusicaRubo";
+import { COLORES_CUEVA, crearCueva, puntosSvg } from "@/lib/cueva";
 import { FRASES_RUBO, letras, PAUSA_ENTRE_FRASES, tiempoHablando } from "@/lib/dialogo";
 import { useRecordado } from "@/hooks/useRecordado";
 import { CLAVE_VICTORIAS, leerVictorias, SIN_VICTORIAS, type Victorias, VICTORIAS_PARA_IA } from "@/hooks/useVictoriasRubo";
@@ -43,6 +46,7 @@ import {
   CORAZONES_JUGADOR,
   GOLES_IA,
   MARGEN,
+  NIVEL_ARCADE_MAXIMO,
   type Nivel,
   NIVELES,
   nuevoJuego,
@@ -53,8 +57,51 @@ import { espacio, fuente, radio, useColores } from "@/theme";
 
 const OPCIONES_NIVEL = [
   { clave: "normal", titulo: "Normal" },
+  { clave: "arcade", titulo: "Arcade" },
   { clave: "ia", titulo: "IA" },
 ] as const;
+
+/**
+ * El arcade se abre con solo entrar una vez a jugar el modo IA (aunque pierdas). Queda guardado en el
+ * celular. `null` mientras se lee.
+ */
+const CLAVE_IA_JUGADA = "pong:iaJugada";
+function useIaJugada(): [boolean | null, () => void, () => void] {
+  const [jugada, setJugada] = useState<boolean | null>(null);
+  useEffect(() => {
+    AsyncStorage.getItem(CLAVE_IA_JUGADA)
+      .then((t) => setJugada(t === "1"))
+      .catch(() => setJugada(false));
+  }, []);
+  const marcar = useCallback(() => {
+    setJugada(true);
+    AsyncStorage.setItem(CLAVE_IA_JUGADA, "1").catch(() => {});
+  }, []);
+  const reiniciar = useCallback(() => {
+    setJugada(false);
+    AsyncStorage.removeItem(CLAVE_IA_JUGADA).catch(() => {});
+  }, []);
+  return [jugada, marcar, reiniciar];
+}
+
+/** Récord del arcade: la mayor cantidad de goles tuyos en una partida, guardada en el celular. */
+const CLAVE_RECORD_ARCADE = "pong:arcade:record";
+function useRecordArcade(): [number, (goles: number) => void] {
+  const [record, setRecord] = useState(0);
+  useEffect(() => {
+    AsyncStorage.getItem(CLAVE_RECORD_ARCADE)
+      .then((t) => setRecord(Math.max(0, Number(t) || 0)))
+      .catch(() => {});
+  }, []);
+  const anotar = useCallback((goles: number) => {
+    setRecord((r) => {
+      if (goles <= r) return r;
+      AsyncStorage.setItem(CLAVE_RECORD_ARCADE, String(goles)).catch(() => {});
+      return goles;
+    });
+  }, []);
+  return [record, anotar];
+}
 
 /** La cancha mide siempre 2 de ancho por 3,7 de alto (si no cabe a todo el ancho, se angosta). */
 const PROPORCION_CANCHA = 1.85;
@@ -157,7 +204,9 @@ function useVictorias(): [Victorias, (n: Nivel) => void, boolean, () => void, ()
       .finally(() => setCargado(true));
   }, []);
 
+  // El arcade no se gana (es infinito): no suma.
   const sumar = (n: Nivel) =>
+    n !== "arcade" &&
     setVictorias((v) => {
       const nuevas = { ...v, [n]: v[n] + 1 };
       AsyncStorage.setItem(CLAVE_VICTORIAS, JSON.stringify(nuevas)).catch(() => {});
@@ -216,10 +265,18 @@ function useCadenasRotas(): [boolean | null, () => void, () => void] {
 export default function Rubo() {
   const [nivel, setNivel] = useRecordado<Nivel>("pong:nivel", "normal", NIVELES);
   const [jugando, setJugando] = useState(false);
-  // Salir mientras juegas (flecha de arriba o "atrás" del celular) te lleva al menú de nivel, no a Inicio.
-  usePreventRemove(jugando, () => setJugando(false));
+  const [pausado, setPausado] = useState(false);
+  // Mientras juegas, "atrás" del celular pausa (y si ya está en pausa, sigue). Se sale desde la pausa.
+  usePreventRemove(jugando, () => setPausado((p) => !p));
+  const salir = () => {
+    setPausado(false);
+    setJugando(false);
+  };
+  // Estable: el juego la usa para el botón del encabezado y al irse la app a segundo plano.
+  const pausar = useCallback(() => setPausado(true), []);
   const [victorias, sumarVictoria, cargado, reiniciarVictorias, desbloquearIa] = useVictorias();
   const [cadenasRotas, marcarCadenasRotas, reiniciarCadenas] = useCadenasRotas();
+  const [iaJugada, marcarIaJugada, reiniciarIaJugada] = useIaJugada();
 
   const desbloqueada = PRUEBA_DESBLOQUEO || victorias.normal >= VICTORIAS_PARA_IA;
   // Si quedó guardado "IA" pero aún no se ha desbloqueado (o siguen las cadenas), se juega en normal.
@@ -229,7 +286,14 @@ export default function Rubo() {
   const cadenas = cargado && (!desbloqueada || cadenasRotas === false);
 
   return jugando ? (
-    <Juego nivel={nivelActual} alGanar={() => sumarVictoria(nivelActual)} />
+    <Juego
+      nivel={nivelActual}
+      alGanar={() => sumarVictoria(nivelActual)}
+      pausado={pausado}
+      alPausar={pausar}
+      alContinuar={() => setPausado(false)}
+      alSalir={salir}
+    />
   ) : (
     <Menu
       nivel={nivelActual}
@@ -238,7 +302,13 @@ export default function Rubo() {
       desbloqueada={desbloqueada}
       cadenas={cadenas}
       alRomperCadenas={marcarCadenasRotas}
-      alJugar={() => setJugando(true)}
+      arcadeAbierto={iaJugada === true}
+      alJugar={() => {
+        if (nivelActual === "arcade" && iaJugada !== true) return;
+        // Entrar a jugar el modo IA (aunque pierdas) abre el arcade.
+        if (nivelActual === "ia") marcarIaJugada();
+        setJugando(true);
+      }}
       // Solo en desarrollo (Expo Go): mantener presionado el control alterna entre borrar el progreso
       // (modo IA bloqueado y con cadenas) y lo contrario (modo IA desbloqueado, con las cadenas por romper).
       alReiniciar={
@@ -247,6 +317,7 @@ export default function Rubo() {
               if (desbloqueada) {
                 reiniciarVictorias();
                 reiniciarCadenas();
+                reiniciarIaJugada();
                 setNivel("normal");
               } else {
                 // Las cadenas quedan puestas y vibrando, para romperlas tú tocando el modo IA.
@@ -267,6 +338,7 @@ function Menu({
   desbloqueada,
   cadenas,
   alRomperCadenas,
+  arcadeAbierto,
   alJugar,
   alReiniciar,
 }: {
@@ -277,6 +349,8 @@ function Menu({
   /** Si el modo IA aún tiene las cadenas puestas. */
   cadenas: boolean;
   alRomperCadenas: () => void;
+  /** Si ya jugaste el modo IA alguna vez (si no, el arcade se puede elegir pero no jugar). */
+  arcadeAbierto: boolean;
   alJugar: () => void;
   /** Borra victorias y cadenas (solo en desarrollo). */
   alReiniciar?: () => void;
@@ -286,14 +360,21 @@ function Menu({
   const [rompiendo, setRompiendo] = useState(false);
   // Cada toque al modo IA bloqueado sacude las cadenas y el candado (sin romperlas).
   const [forcejeos, setForcejeos] = useState(0);
+  const [record] = useRecordArcade();
+  // El arcade se puede elegir siempre, pero sin haber jugado el modo IA no se puede jugar.
+  const arcadeCerrado = nivel === "arcade" && !arcadeAbierto;
   const descripcion =
     nivel === "ia"
       ? "Imposible."
-      : !desbloqueada
-        ? `Gana ${VICTORIAS_PARA_IA} veces para desbloquear el modo IA (llevas ${victoriasNormal} de ${VICTORIAS_PARA_IA}).`
-        : cadenas
-          ? "¡Desbloqueaste el modo IA! Tócalo para romper las cadenas."
-          : "Modo normal.";
+      : arcadeCerrado
+        ? "Juega el modo IA una vez (aunque pierdas) para abrir el arcade."
+        : nivel === "arcade"
+          ? `Infinito: cada gol tuyo sube el nivel. Tu récord: ${record} ${record === 1 ? "gol" : "goles"}.`
+          : !desbloqueada
+            ? `Gana ${VICTORIAS_PARA_IA} veces para desbloquear el modo IA (llevas ${victoriasNormal} de ${VICTORIAS_PARA_IA}).`
+            : cadenas
+              ? "¡Desbloqueaste el modo IA! Tócalo para romper las cadenas."
+              : "Modo normal.";
 
   // Ya desbloqueado, tocar el modo IA encadenado rompe las cadenas; al terminar, queda elegido.
   const elegir = (n: Nivel) => {
@@ -327,7 +408,9 @@ function Menu({
           Desliza el dedo para mover tu barra.{" "}
           {nivel === "ia"
             ? `Rubo tiene ${GOLES_IA} corazones y tú ${CORAZONES_JUGADOR}: cada gol rompe uno.`
-            : `Gana el primero que llegue a ${PUNTOS_PARA_GANAR}.`}
+            : nivel === "arcade"
+              ? "No se acaba: juega hasta donde aguantes."
+              : `Gana el primero que llegue a ${PUNTOS_PARA_GANAR}.`}
         </Text>
       </Entrada>
       <Entrada retraso={PASO_ENTRADA}>
@@ -347,15 +430,49 @@ function Menu({
         </Panel>
       </Entrada>
       <Entrada retraso={2 * PASO_ENTRADA} style={styles.menuBotones}>
-        <Boton texto="Jugar" alTocar={alJugar} />
+        <Boton texto="Jugar" alTocar={alJugar} deshabilitado={arcadeCerrado} />
       </Entrada>
     </View>
   );
 }
 
 // Para cambiar de nivel se sale con la flecha de arriba (o "atrás"), que lleva al menú.
-function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
+function Juego({
+  nivel,
+  alGanar,
+  pausado,
+  alPausar,
+  alContinuar,
+  alSalir,
+}: {
+  nivel: Nivel;
+  alGanar: () => void;
+  /** En pausa: el juego se congela, la música se calla y encima sale Continuar / Salir. */
+  pausado: boolean;
+  alPausar: () => void;
+  alContinuar: () => void;
+  alSalir: () => void;
+}) {
   const c = useColores();
+  // Mientras juegas, arriba a la izquierda va el botón de pausa en vez de la flecha de atrás.
+  const navegacion = useNavigation();
+  useLayoutEffect(() => {
+    navegacion.setOptions({
+      headerBackVisible: false,
+      headerLeft: () => (
+        <Presionable onPress={alPausar} accessibilityRole="button" accessibilityLabel="Pausa" hitSlop={12} style={styles.botonPausa}>
+          <Ionicons name="pause" size={24} color={c.enfasis} />
+        </Presionable>
+      ),
+    });
+    return () => navegacion.setOptions({ headerBackVisible: true, headerLeft: undefined });
+  }, [navegacion, alPausar, c.enfasis]);
+  const pausadoRef = useRef(pausado);
+  // Si sales de la app a mitad de partida, al volver la encuentras en pausa.
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (estado) => estado !== "active" && alPausar());
+    return () => sub.remove();
+  }, [alPausar]);
   const insets = useSafeAreaInsets();
   // El encabezado es transparente (para que la cuadrícula del menú llegue arriba): se deja su espacio.
   const altoEncabezado = useHeaderHeight();
@@ -368,7 +485,8 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
     x: number;
   } | null>(null);
   const [estado, setEstado] = useState<Estado | null>(null);
-  const [efectos, setEfectos] = useState<{ ondas: number[]; particulas: Particula[] }>({ ondas: [], particulas: [] });
+  /** La capa de partículas y ondas se actualiza sola (ver `CapaEfectos`), sin redibujar el juego entero. */
+  const conectorEfectos = useRef<((e: Efectos) => void) | null>(null);
   /** Cambia con cada revancha para volver a arrancar el ciclo del juego. */
   const [ronda, setRonda] = useState(0);
   /** Falla de pantalla cuando anota la IA: avance de 0 a 1 y franjas corridas que se dibujan mientras dura. */
@@ -456,12 +574,24 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
   // además, la estática de los glitches y la música: la fase 1 suena desde el saque inicial y al terminar
   // la partida se calla; las fases 2 y 3 entran cuando Rubo termina de escribir (ver `Dialogo`).
   const musica = useMusicaRubo();
-  const conMusica = nivel === "ia" && tam !== null;
+  useEffect(() => {
+    pausadoRef.current = pausado;
+    musica.pausa(pausado);
+  }, [pausado, musica]);
+  const conMusica = nivel !== "normal" && tam !== null;
   useEffect(() => {
     if (!conMusica) return;
-    musica.tocar(1, true);
+    if (nivel === "arcade") musica.tocarArcade();
+    else musica.tocar(1, true);
     return () => musica.parar();
-  }, [conMusica, ronda, musica]);
+  }, [conMusica, nivel, ronda, musica]);
+
+  // Arcade: el récord se actualiza con cada gol tuyo.
+  const [record, anotarRecord] = useRecordArcade();
+  const golesJugador = estado?.puntos.jugador ?? 0;
+  useEffect(() => {
+    if (nivel === "arcade") anotarRecord(golesJugador);
+  }, [nivel, golesJugador, anotarRecord]);
   useEffect(() => {
     if (fin) musica.parar();
   }, [fin, musica]);
@@ -566,6 +696,12 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       rafaga(suave ? leve.rafagas : pierdes ? RAFAGAS_ANTES_DE_RUBOKILL : nivel);
     };
     const cuadro = (t: number) => {
+      // En pausa no avanza nada (y al seguir, el tiempo cuenta desde ahí, sin saltos).
+      if (pausadoRef.current) {
+        ultimo = null;
+        id = requestAnimationFrame(cuadro);
+        return;
+      }
       const dt = ultimo === null ? 0 : (t - ultimo) / 1000;
       ultimo = t;
       const antes = estadoRef.current;
@@ -581,7 +717,8 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
         // Modo IA: al empezar las fases 2 y 3 (tus goles 2 y 4) Rubo te habla. La música se corta, suena su voz mientras
         // escribe y el saque espera a que termine de escribir.
         const dice = antes.nivel === "ia" && s.puntos.jugador > antes.puntos.jugador ? FRASES_RUBO[s.puntos.jugador] : undefined;
-        // (Los goles no tienen sonido propio: solo los glitches y la voz de Rubo.)
+        // En normal y arcade los goles suenan; en la IA no tienen sonido propio (solo los glitches y la voz de Rubo).
+        if (antes.nivel !== "ia") musica.gol(s.puntos.jugador > antes.puntos.jugador ? "jugador" : "maquina");
         if (dice) {
           saqueBloqueadoHasta.current = Date.now() + tiempoHablando(dice) + ESPERA_FRASE;
           setFrase({ goles: s.puntos.jugador, frases: dice });
@@ -601,7 +738,7 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       pintar(s, tam.ancho);
       if (s.fase !== antes.fase || s.puntos !== antes.puntos) setEstado(s);
       const conEfectos = particulas.length > 0 || ondas.length > 0;
-      if (conEfectos || hayEfectos) setEfectos({ ondas, particulas });
+      if (conEfectos || hayEfectos) conectorEfectos.current?.({ ondas, particulas, bola: s.bola });
       hayEfectos = conEfectos;
       if (s.fase !== "fin" || particulas.length > 0) id = requestAnimationFrame(cuadro);
     };
@@ -618,6 +755,9 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       golpe.setValue(0);
       setNegro(false);
       setVerRubokill(false);
+      // Si se reinicia a mitad de una ráfaga de glitches, que no queden franjas pegadas.
+      setCortes([]);
+      falla.setValue(0);
       cancelAnimationFrame(id);
     };
     // `alGanar` cambia en cada render de la pantalla; solo importa el último.
@@ -626,11 +766,12 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
 
   // Se usa la posición en la pantalla (pageX): el dedo puede estar en la cancha o debajo de ella.
   const mover = (e: GestureResponderEvent) => {
-    if (tam) dedo.current = (e.nativeEvent.pageX - tam.x) / tam.ancho;
+    if (tam && !pausadoRef.current) dedo.current = (e.nativeEvent.pageX - tam.x) / tam.ancho;
   };
 
   // El saque sale solo cuando tocas la pantalla (al empezar y después de cada gol).
   const tocar = (e: GestureResponderEvent) => {
+    if (pausadoRef.current) return;
     if (Date.now() < saqueBloqueadoHasta.current) {
       mover(e);
       return;
@@ -658,17 +799,22 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
   // líneas, su marcador, un rojo que respira sobre la cancha y una viñeta roja en toda la pantalla; tu
   // barra se apaga un poco.
   const fase3 = ia && estado !== null && faseRubo(estado) >= 3;
+  // Arcade: la cancha es una cueva oscura (igual en modo claro y oscuro), con colores fijos que se ven sobre ella.
+  const enCueva = nivel === "arcade";
   const colores = {
-    fondo: ia ? c.peligroSuave : c.superficie,
-    borde: fase3 ? c.peligro : ia ? `${c.peligro}66` : c.borde,
-    trazos: fase3 ? `${c.peligro}80` : ia ? `${c.peligro}40` : c.borde,
-    maquina: ia ? c.peligro : c.tinta2,
+    fondo: enCueva ? COLORES_CUEVA.fondoAbajo : ia ? c.peligroSuave : c.superficie,
+    borde: enCueva ? `${COLORES_CUEVA.filo}80` : fase3 ? c.peligro : ia ? `${c.peligro}66` : c.borde,
+    trazos: enCueva ? "#FFFFFF33" : fase3 ? `${c.peligro}80` : ia ? `${c.peligro}40` : c.borde,
+    maquina: enCueva ? COLORES_CUEVA.cristal2 : ia ? c.peligro : c.tinta2,
+    jugador: enCueva ? COLORES_CUEVA.cristal : c.enfasis,
+    bola: enCueva ? "#FFFFFF" : c.tinta,
   };
 
   // Tamaño de la cancha: 1,85 veces más alta que ancha, lo más grande que quepa dejando libre la
   // zona de abajo; si no cabe a todo el ancho, se angosta y queda centrada.
   // En la IA, arriba de la cancha va la fila de corazones de Rubo.
-  const filaCorazones = ia ? ALTO_CORAZON + espacio.m : 0;
+  const arcade = nivel === "arcade";
+  const filaCorazones = ia || arcade ? ALTO_CORAZON + espacio.m : 0;
   const relleno = { arriba: altoEncabezado + espacio.m + filaCorazones, abajo: insets.bottom };
   const altoDisponible = area ? area.alto - relleno.arriba - relleno.abajo - ZONA_DEDO_MINIMA : 0;
   const anchoCancha = area ? Math.max(0, Math.min(area.ancho - 2 * espacio.l, altoDisponible / PROPORCION_CANCHA)) : 0;
@@ -708,6 +854,9 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       onTouchStart={tocar}
       onTouchMove={mover}
     >
+      {/* Arcade: detrás de la cancha, en toda la pantalla, otra cueva igual pero solo en líneas, sin color. */}
+      {enCueva && area ? <FondoCuevaLineas ancho={area.ancho} alto={area.alto} color={c.tinta} /> : null}
+
       {/* Fase 3: detrás de la cancha, el rojo nace desde Rubo (arriba) y se extiende con borde difuminado
           hasta llenar todo el fondo; después late con él. */}
       {(fase3 || rojoSaliendo) && area ? (
@@ -720,6 +869,14 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
           saliendo={!fase3 && rojoSaliendo}
           alSalir={() => setRojoSaliendo(false)}
         />
+      ) : null}
+
+      {/* Arcade: arriba el nivel y el récord, en letra de 8 bits. */}
+      {arcade && estado ? (
+        <View pointerEvents="none" style={[styles.marcadorArcade, { top: altoEncabezado + espacio.s }]}>
+          <Text style={[styles.textoArcade, { color: c.enfasis }]}>NIVEL {Math.min(golesJugador, NIVEL_ARCADE_MAXIMO - 1) + 1}</Text>
+          <Text style={[styles.textoArcade, { color: c.tinta2 }]}>RÉCORD {Math.max(record, golesJugador)}</Text>
+        </View>
       ) : null}
 
       {/* Modo IA: arriba los 7 corazones de Rubo (negros cuando el fondo se pone rojo) y abajo tus 3. */}
@@ -770,7 +927,11 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
                     ]}
                   />
                 ) : null}
-                <Decoracion ancho={tam.ancho} alto={tam.alto} color={colores.trazos} />
+                {enCueva ? (
+                  <FondoCueva ancho={tam.ancho} alto={tam.alto} />
+                ) : (
+                  <Decoracion ancho={tam.ancho} alto={tam.alto} color={colores.trazos} />
+                )}
                 <LineaMedio ancho={tam.ancho} alto={tam.alto} color={colores.trazos} />
 
                 {/* Puntos grandes y tenues de fondo: arriba la máquina, abajo tú. */}
@@ -792,33 +953,12 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
                   dolor={dolor}
                   temblor={temblor}
                 />
-                <Barra x={pos.jugador} y={estado.alto - MARGEN} ancho={tam.ancho} color={c.enfasis} apagada={fase3} />
-                {estado.fase !== "fin" ? <Bola x={pos.bolaX} y={pos.bolaY} golpe={golpe} ancho={tam.ancho} color={c.tinta} /> : null}
+                <Barra x={pos.jugador} y={estado.alto - MARGEN} ancho={tam.ancho} color={colores.jugador} apagada={fase3} />
+                {estado.fase !== "fin" ? (
+                  <Bola x={pos.bolaX} y={pos.bolaY} golpe={golpe} ancho={tam.ancho} color={colores.bola} />
+                ) : null}
 
-                <Svg width={tam.ancho} height={tam.alto} pointerEvents="none" style={StyleSheet.absoluteFill}>
-                  {efectos.particulas.map((p, i) => (
-                    <Circle
-                      key={i}
-                      cx={p.x * tam.ancho}
-                      cy={p.y * tam.ancho}
-                      r={BOLA_RADIO * tam.ancho * (0.25 + 0.3 * p.vida)}
-                      fill={c.enfasis}
-                      opacity={p.vida}
-                    />
-                  ))}
-                  {efectos.ondas.map((avance, i) => (
-                    <Circle
-                      key={i}
-                      cx={estado.bola.x * tam.ancho}
-                      cy={estado.bola.y * tam.ancho}
-                      r={BOLA_RADIO * tam.ancho * (1 + (ALCANCE_ONDA - 1) * avance)}
-                      stroke={c.enfasis}
-                      strokeWidth={4}
-                      fill="none"
-                      opacity={0.8 * (1 - avance)}
-                    />
-                  ))}
-                </Svg>
+                <CapaEfectos conectorRef={conectorEfectos} ancho={tam.ancho} alto={tam.alto} color={c.enfasis} />
               </>
             ) : null}
 
@@ -872,6 +1012,17 @@ function Juego({ nivel, alGanar }: { nivel: Nivel; alGanar: () => void }) {
       >
         <Image source={FOTO_RUBOKILL} resizeMode="contain" style={styles.fotoRubokill} />
       </Presionable>
+      {pausado ? (
+        <Pausa
+          alContinuar={alContinuar}
+          alReiniciar={() => {
+            // Partida nueva desde cero (en el arcade, con otra canción) y sin pausa.
+            revancha();
+            alContinuar();
+          }}
+          alSalir={alSalir}
+        />
+      ) : null}
       {cortes.map((corte, i) => (
         <View
           key={i}
@@ -1187,6 +1338,89 @@ const Decoracion = memo(function Decoracion({ ancho, alto, color }: { ancho: num
 });
 
 /**
+ * Fondo de la cancha del arcade: una cueva low-poly al estilo de Geometry Dash (ver lib/cueva.ts).
+ * Se arma una sola vez por tamaño de cancha y no se anima, para no pesarle al juego.
+ */
+const FondoCueva = memo(function FondoCueva({ ancho, alto }: { ancho: number; alto: number }) {
+  // Si cambia el tamaño de la cancha, la cueva se vuelve a armar a la medida.
+  const cueva = useMemo(() => crearCueva(ancho, alto), [ancho, alto]);
+  const C = COLORES_CUEVA;
+  return (
+    <Svg width={ancho} height={alto} pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <LinearGradient id="cueva-fondo" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={C.fondoArriba} />
+          <Stop offset="1" stopColor={C.fondoAbajo} />
+        </LinearGradient>
+        {/* Viñeta: las orillas más oscuras, para que la mirada vaya al centro. */}
+        <RadialGradient id="cueva-vineta" cx="0.5" cy="0.5" r="0.75">
+          <Stop offset="0.55" stopColor="#000000" stopOpacity={0} />
+          <Stop offset="1" stopColor="#000000" stopOpacity={0.55} />
+        </RadialGradient>
+        {cueva.halos.map((h, i) => (
+          <RadialGradient key={i} id={`cueva-halo-${i}`}>
+            <Stop offset="0" stopColor={h.color} stopOpacity={h.opacidad} />
+            <Stop offset="1" stopColor={h.color} stopOpacity={0} />
+          </RadialGradient>
+        ))}
+      </Defs>
+      <Rect width={ancho} height={alto} fill="url(#cueva-fondo)" />
+      {cueva.halos.map((h, i) => (
+        <Circle key={i} cx={h.x} cy={h.y} r={h.r} fill={`url(#cueva-halo-${i})`} />
+      ))}
+      {cueva.figuras.map((f, i) => {
+        const comun = {
+          points: puntosSvg(f.puntos),
+          stroke: f.borde ?? "none",
+          strokeWidth: f.grosor ?? 1,
+          strokeLinejoin: "round" as const,
+          opacity: f.opacidad ?? 1,
+        };
+        return f.abierta ? (
+          <Polyline key={i} {...comun} fill="none" strokeLinecap="round" />
+        ) : (
+          <Polygon key={i} {...comun} fill={f.relleno} />
+        );
+      })}
+      {cueva.motas.map((m, i) => (
+        <Circle key={i} cx={m.x} cy={m.y} r={m.r} fill={m.color} opacity={m.opacidad} />
+      ))}
+      <Rect width={ancho} height={alto} fill="url(#cueva-vineta)" />
+    </Svg>
+  );
+});
+
+/**
+ * Fondo de toda la pantalla del arcade, detrás de la cancha: otra cueva (con otra semilla) dibujada solo
+ * con líneas tenues del color de la letra, sin rellenos ni colores: el filo de la roca más marcado y las
+ * facetas apenas. Estática, como la de la cancha.
+ */
+const FondoCuevaLineas = memo(function FondoCuevaLineas({ ancho, alto, color }: { ancho: number; alto: number; color: string }) {
+  const cueva = useMemo(() => crearCueva(ancho, alto, 23), [ancho, alto]);
+  return (
+    <Svg width={ancho} height={alto} pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {cueva.figuras.map((f, i) => {
+        // Las líneas abiertas son el filo de la roca (fino) y su resplandor (grueso, que aquí no va).
+        const filo = f.abierta && (f.grosor ?? 1) < 3;
+        if (f.abierta && !filo) return null;
+        const comun = {
+          points: puntosSvg(f.puntos),
+          fill: "none",
+          stroke: color,
+          strokeWidth: filo ? 1.2 : 0.6,
+          strokeLinejoin: "round" as const,
+          opacity: filo ? 0.35 : 0.12,
+        };
+        return f.abierta ? <Polyline key={i} {...comun} /> : <Polygon key={i} {...comun} />;
+      })}
+      {cueva.motas.map((m, i) => (
+        <Circle key={i} cx={m.x} cy={m.y} r={m.r} fill={color} opacity={0.18} />
+      ))}
+    </Svg>
+  );
+});
+
+/**
  * Barra de un jugador: una vista que se mueve sola con `x` (px del borde izquierdo), sin volver a
  * dibujarse. Con `brillo`, lleva un halo de su color detrás (la de la IA). `golpe` la estira un
  * momento y `furia` hace latir el halo (cuando la IA se pone imposible). Memorizada: sus props no
@@ -1227,64 +1461,66 @@ const Barra = memo(function Barra({
   };
   const de = (v: Animated.Value | undefined, salida: [number, number]) =>
     v ? v.interpolate({ inputRange: [0, 1], outputRange: salida }) : salida[0];
+  // La posición (que el juego cambia en cada cuadro) va en la vista de afuera; el temblor, el golpe y el
+  // dolor (animaciones nativas) en la de adentro. Así no se mezclan en una misma vista.
   return (
     <Animated.View
       pointerEvents="none"
-      style={[
-        styles.barra,
-        {
-          top: (y - BARRA_ALTO / 2) * ancho,
+      style={[styles.barra, { top: (y - BARRA_ALTO / 2) * ancho, width: largo, height: grosor, transform: [{ translateX: x }] }]}
+    >
+      <Animated.View
+        style={{
           width: largo,
           height: grosor,
           opacity: apagada ? 0.7 : 1,
           transform: [
-            { translateX: temblor ? Animated.add(x, Animated.multiply(temblor, 5)) : x },
+            { translateX: temblor ? Animated.multiply(temblor, 5) : 0 },
             { translateY: de(dolor, [0, -10]) },
             { scaleX: de(golpe, [1, 1.3]) },
             { scaleY: de(golpe, [1, 1.8]) },
             { scaleX: de(dolor, [1, 0.88]) },
             { scaleY: de(dolor, [1, 0.45]) },
           ],
-        },
-      ]}
-    >
-      {brillo ? (
-        <>
+        }}
+      >
+        {brillo ? (
+          <>
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: -8,
+                top: -8,
+                right: -8,
+                bottom: -8,
+                borderRadius: grosor / 2 + 8,
+                backgroundColor: color,
+                opacity: halo(0.12, 0.4),
+              }}
+            />
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: -4,
+                top: -4,
+                right: -4,
+                bottom: -4,
+                borderRadius: grosor / 2 + 4,
+                backgroundColor: color,
+                opacity: halo(0.22, 0.6),
+              }}
+            />
+          </>
+        ) : null}
+        <View style={{ flex: 1, borderRadius: grosor / 2, backgroundColor: color }} />
+        {dolor ? (
           <Animated.View
-            style={{
-              position: "absolute",
-              left: -8,
-              top: -8,
-              right: -8,
-              bottom: -8,
-              borderRadius: grosor / 2 + 8,
-              backgroundColor: color,
-              opacity: halo(0.12, 0.4),
-            }}
+            style={[
+              StyleSheet.absoluteFill,
+              { borderRadius: grosor / 2, backgroundColor: "#FFFFFF", opacity: dolor.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] }) },
+            ]}
           />
-          <Animated.View
-            style={{
-              position: "absolute",
-              left: -4,
-              top: -4,
-              right: -4,
-              bottom: -4,
-              borderRadius: grosor / 2 + 4,
-              backgroundColor: color,
-              opacity: halo(0.22, 0.6),
-            }}
-          />
-        </>
-      ) : null}
-      <View style={{ flex: 1, borderRadius: grosor / 2, backgroundColor: color }} />
-      {dolor ? (
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { borderRadius: grosor / 2, backgroundColor: "#FFFFFF", opacity: dolor.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] }) },
-          ]}
-        />
-      ) : null}
+        ) : null}
+      </Animated.View>
     </Animated.View>
   );
 });
@@ -1385,6 +1621,10 @@ function FondoRubo({
 }
 
 /** La bola: una vista que se mueve sola con `x` e `y` (px) y se infla con `golpe`. Memorizada, como las barras. */
+/**
+ * La bola. La posición (que el juego cambia en cada cuadro) y el inflado de `golpe` (animación nativa)
+ * van en vistas separadas, para no mezclar en una misma vista valores del juego y del driver nativo.
+ */
 const Bola = memo(function Bola({
   x,
   y,
@@ -1398,20 +1638,69 @@ const Bola = memo(function Bola({
   ancho: number;
   color: string;
 }) {
+  const lado = 2 * BOLA_RADIO * ancho;
   return (
     <Animated.View
       pointerEvents="none"
-      style={[
-        styles.bola,
-        {
-          width: 2 * BOLA_RADIO * ancho,
-          height: 2 * BOLA_RADIO * ancho,
-          borderRadius: BOLA_RADIO * ancho,
+      style={[styles.bola, { width: lado, height: lado, transform: [{ translateX: x }, { translateY: y }] }]}
+    >
+      <Animated.View
+        style={{
+          width: lado,
+          height: lado,
+          borderRadius: lado / 2,
           backgroundColor: color,
-          transform: [{ translateX: x }, { translateY: y }, { scale: golpe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] }) }],
-        },
-      ]}
-    />
+          transform: [{ scale: golpe.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] }) }],
+        }}
+      />
+    </Animated.View>
+  );
+});
+
+type Efectos = { ondas: number[]; particulas: Particula[]; bola: Punto };
+
+/**
+ * Partículas del gol y ondas del saque. Tiene su propio estado: el juego le pasa cada cuadro por
+ * `conectorRef` y solo esta capa se vuelve a dibujar. Antes se redibujaba toda la pantalla del juego en
+ * cada cuadro mientras había efectos, y la bola se trababa justo después de los goles.
+ */
+const CapaEfectos = memo(function CapaEfectos({
+  conectorRef,
+  ancho,
+  alto,
+  color,
+}: {
+  conectorRef: { current: ((e: Efectos) => void) | null };
+  ancho: number;
+  alto: number;
+  color: string;
+}) {
+  const [efectos, setEfectos] = useState<Efectos>({ ondas: [], particulas: [], bola: { x: 0, y: 0 } });
+  useEffect(() => {
+    conectorRef.current = setEfectos;
+    return () => {
+      conectorRef.current = null;
+    };
+  }, [conectorRef]);
+  if (efectos.particulas.length === 0 && efectos.ondas.length === 0) return null;
+  return (
+    <Svg width={ancho} height={alto} pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {efectos.particulas.map((p, i) => (
+        <Circle key={i} cx={p.x * ancho} cy={p.y * ancho} r={BOLA_RADIO * ancho * (0.25 + 0.3 * p.vida)} fill={color} opacity={p.vida} />
+      ))}
+      {efectos.ondas.map((avance, i) => (
+        <Circle
+          key={i}
+          cx={efectos.bola.x * ancho}
+          cy={efectos.bola.y * ancho}
+          r={BOLA_RADIO * ancho * (1 + (ALCANCE_ONDA - 1) * avance)}
+          stroke={color}
+          strokeWidth={4}
+          fill="none"
+          opacity={0.8 * (1 - avance)}
+        />
+      ))}
+    </Svg>
   );
 });
 
@@ -1686,15 +1975,63 @@ function Final({
   );
 }
 
-function Boton({ texto, alTocar }: { texto: string; alTocar: () => void }) {
+/**
+ * Pausa, sobre todo el juego: "PAUSA" en bloque brutalista y debajo Continuar, Reiniciar (partida
+ * nueva) y Salir (al menú).
+ */
+function Pausa({ alContinuar, alReiniciar, alSalir }: { alContinuar: () => void; alReiniciar: () => void; alSalir: () => void }) {
+  const c = useColores();
+  return (
+    <View style={[styles.capa, { backgroundColor: `${c.fondo}E6` }]}>
+      <Entrada style={styles.final}>
+        <View>
+          <View style={[styles.sombraDura, { backgroundColor: c.tinta }]} />
+          <View style={[styles.bloque, { backgroundColor: c.enfasis, borderColor: c.tinta }]}>
+            <Text style={[styles.tituloFinal, { color: c.sobreEnfasis }]} accessibilityRole="header">
+              PAUSA
+            </Text>
+          </View>
+        </View>
+        <View style={styles.botonesPausa}>
+          <Boton texto="Continuar" alTocar={alContinuar} />
+          <Boton texto="Reiniciar" alTocar={alReiniciar} secundario />
+          <Boton texto="Salir" alTocar={alSalir} secundario />
+        </View>
+      </Entrada>
+    </View>
+  );
+}
+
+/** `deshabilitado`: se ve apagado y no hace nada. `secundario`: solo borde, sin relleno. */
+function Boton({
+  texto,
+  alTocar,
+  deshabilitado = false,
+  secundario = false,
+}: {
+  texto: string;
+  alTocar: () => void;
+  deshabilitado?: boolean;
+  secundario?: boolean;
+}) {
   const c = useColores();
   return (
     <Presionable
       onPress={alTocar}
+      disabled={deshabilitado}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.boton, { backgroundColor: c.enfasis, opacity: pressed ? 0.8 : 1 }]}
+      accessibilityState={{ disabled: deshabilitado }}
+      style={({ pressed }) => [
+        styles.boton,
+        secundario
+          ? { backgroundColor: "transparent", borderWidth: 2, borderColor: c.enfasis }
+          : { backgroundColor: deshabilitado ? c.borde : c.enfasis },
+        { opacity: pressed ? 0.8 : 1 },
+      ]}
     >
-      <Text style={[styles.textoBoton, { color: c.sobreEnfasis }]}>{texto}</Text>
+      <Text style={[styles.textoBoton, { color: secundario ? c.enfasis : deshabilitado ? c.apagado : c.sobreEnfasis }]}>
+        {texto}
+      </Text>
     </Presionable>
   );
 }
@@ -1741,8 +2078,20 @@ const styles = StyleSheet.create({
   textoMenu: { fontSize: 16, textAlign: "center", lineHeight: 23 },
   nota: { fontSize: 13, marginTop: espacio.m },
   menuBotones: { paddingHorizontal: espacio.l },
+  botonPausa: { padding: espacio.xs },
+  botonesPausa: { alignSelf: "stretch", gap: espacio.m, paddingHorizontal: espacio.xl, minWidth: 240 },
   juego: { flex: 1, paddingHorizontal: espacio.l },
   contenedorCancha: { alignSelf: "center" },
+  marcadorArcade: {
+    position: "absolute",
+    left: espacio.l,
+    right: espacio.l,
+    height: ALTO_CORAZON,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  textoArcade: { fontFamily: fuente.pixel, fontSize: 12 },
   corazones: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
   corte: { position: "absolute", left: 0, right: 0 },
   // RuboKill: fondo casi negro con un tinte rojo, la foto lo más grande que quepa.

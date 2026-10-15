@@ -2,8 +2,9 @@
 // Medidas en "anchos de cancha": x va de 0 a 1 y y de 0 a `alto` (alto ÷ ancho de la pantalla),
 // así los ángulos y las velocidades son iguales en cualquier celular.
 
-export type Nivel = "normal" | "ia";
-export const NIVELES: readonly Nivel[] = ["normal", "ia"];
+/** `arcade`: infinito, nadie gana; cada gol tuyo sube el nivel de la máquina (ver `perfilArcade`). */
+export type Nivel = "normal" | "ia" | "arcade";
+export const NIVELES: readonly Nivel[] = ["normal", "ia", "arcade"];
 
 /**
  * Goles para ganar en normal (los dos). En la IA tú necesitas `GOLES_IA` (los 7 corazones de Rubo) y
@@ -12,9 +13,13 @@ export const NIVELES: readonly Nivel[] = ["normal", "ia"];
 export const PUNTOS_PARA_GANAR = 3;
 export const GOLES_IA = 7;
 export const CORAZONES_JUGADOR = 3;
-/** Cuántos goles necesita cada uno para ganar. */
+/** Cuántos goles necesita cada uno para ganar (en arcade no hay meta: es infinito). */
 export const metas = (nivel: Nivel) =>
-  nivel === "ia" ? { jugador: GOLES_IA, maquina: CORAZONES_JUGADOR } : { jugador: PUNTOS_PARA_GANAR, maquina: PUNTOS_PARA_GANAR };
+  nivel === "ia"
+    ? { jugador: GOLES_IA, maquina: CORAZONES_JUGADOR }
+    : nivel === "arcade"
+      ? { jugador: Infinity, maquina: Infinity }
+      : { jugador: PUNTOS_PARA_GANAR, maquina: PUNTOS_PARA_GANAR };
 /**
  * Con cuántos goles tuyos empieza cada fase de la IA: la 2 con el 2.º gol, la 3 con el 4.º y la 4 con
  * el 6.º, cuando a Rubo le queda un solo corazón.
@@ -23,9 +28,9 @@ export const GOLES_FASE_2 = 2;
 export const GOLES_FASE_3 = 4;
 export const GOLES_FASE_4 = GOLES_IA - 1;
 export type Fase = 1 | 2 | 3 | 4;
-/** Fase de Rubo según tus goles. En normal siempre es 1. */
+/** Fase de Rubo según tus goles. Fuera de la IA siempre es 1. */
 export function faseRubo(e: Pick<Estado, "nivel" | "puntos">): Fase {
-  if (e.nivel === "normal") return 1;
+  if (e.nivel !== "ia") return 1;
   const g = e.puntos.jugador;
   return g >= GOLES_FASE_4 ? 4 : g >= GOLES_FASE_3 ? 3 : g >= GOLES_FASE_2 ? 2 : 1;
 }
@@ -45,6 +50,8 @@ const ANGULO_MAXIMO = (60 * Math.PI) / 180;
 const ANGULO_SAQUE = (25 * Math.PI) / 180;
 /** Pasos de simulación de 1/240 s como máximo, para que la bola no atraviese una barra. */
 const PASO_MAXIMO = 1 / 240;
+/** Lo más que avanza el juego en un cuadro (s), aunque el celular se haya trabado más. */
+export const DT_MAXIMO = 0.05;
 
 /**
  * Cómo juega la máquina en cada nivel. `velocidad`: cuánto se mueve su barra por segundo.
@@ -72,7 +79,7 @@ export interface Perfil {
   subidaSaque: number;
 }
 
-export const MAQUINA: Record<Nivel, Perfil> = {
+export const MAQUINA: Record<"normal" | "ia", Perfil> = {
   normal: {
     velocidad: 1.4,
     error: 0.265,
@@ -128,11 +135,52 @@ export const IA_INVENCIBLE: Perfil = { ...MAQUINA.ia, error: 0, descuido: 0 };
  * en la 4 es invencible (`IA_INVENCIBLE`).
  */
 export function perfil(e: Pick<Estado, "nivel" | "puntos">): Perfil {
+  if (e.nivel === "arcade") return perfilArcade(e.puntos.jugador);
   return [MAQUINA.normal, IA_PICADA, MAQUINA.ia, IA_INVENCIBLE][faseRubo(e) - 1];
 }
 
-/** Velocidad máxima de la bola en un nivel (en la IA, la de la fase 3). */
-export const velocidadTope = (nivel: Nivel) => VEL_MAXIMA * MAQUINA[nivel].tope;
+/**
+ * Arcade: el nivel es tu número de goles + 1. Empieza como el modo normal y con cada nivel la máquina
+ * se mueve más rápido, falla un poco menos y la bola va más rápido, hasta un techo (nivel 16) en el
+ * que sigue fallando de vez en cuando: nunca se vuelve invencible.
+ */
+export const NIVEL_ARCADE_MAXIMO = 16;
+const ARCADE_TECHO: Perfil = {
+  velocidad: 2.6,
+  error: 0.255,
+  reaccion: 0,
+  prevee: true,
+  ataca: false,
+  descuido: 0,
+  ritmo: 1.3,
+  tope: 1.45,
+  aceleracion: 0.05,
+  subidaSaque: 0,
+};
+const perfilesArcade = new Map<number, Perfil>();
+export function perfilArcade(goles: number): Perfil {
+  const n = Math.min(goles, NIVEL_ARCADE_MAXIMO - 1);
+  let p = perfilesArcade.get(n);
+  if (!p) {
+    // Del modo normal (nivel 1) al techo, en línea recta.
+    const t = n / (NIVEL_ARCADE_MAXIMO - 1);
+    const mezcla = (a: number, b: number) => a + (b - a) * t;
+    const base = MAQUINA.normal;
+    p = {
+      ...base,
+      velocidad: mezcla(base.velocidad, ARCADE_TECHO.velocidad),
+      error: mezcla(base.error, ARCADE_TECHO.error),
+      ritmo: mezcla(base.ritmo, ARCADE_TECHO.ritmo),
+      tope: mezcla(base.tope, ARCADE_TECHO.tope),
+      aceleracion: mezcla(base.aceleracion, ARCADE_TECHO.aceleracion),
+    };
+    perfilesArcade.set(n, p);
+  }
+  return p;
+}
+
+/** Velocidad máxima de la bola en un nivel (en la IA, la de la fase 3; en arcade, la del techo). */
+export const velocidadTope = (nivel: Nivel) => VEL_MAXIMA * (nivel === "arcade" ? ARCADE_TECHO : MAQUINA[nivel]).tope;
 const topeDe = (e: Pick<Estado, "nivel" | "puntos">) => VEL_MAXIMA * perfil(e).tope;
 
 export interface Bola {
@@ -332,9 +380,10 @@ export function sacarYa(e: Estado, azar: Azar = Math.random): Estado {
  */
 export function avanzar(e: Estado, dt: number, dedoX: number | null, azar: Azar = Math.random): Estado {
   if (e.fase === "fin") return e;
-  // Si el celular se trabó un momento, no se salta medio partido. Con `rapidez` el juego corre más
-  // tiempo por cada cuadro, en los mismos pasos cortos (así la bola tampoco atraviesa las barras).
-  let resto = Math.min(dt, 0.1) * e.rapidez;
+  // Si el celular se trabó un momento, el juego va más lento ese cuadro en vez de saltar: como mucho
+  // avanza `DT_MAXIMO` (con 0,1 s la bola se "teletransportaba" un buen tramo). Con `rapidez` el juego
+  // corre más tiempo por cada cuadro, en los mismos pasos cortos (así la bola no atraviesa las barras).
+  let resto = Math.min(dt, DT_MAXIMO) * e.rapidez;
   let s: Estado = { ...e, jugador: dedoX === null ? e.jugador : limitarBarra(dedoX) };
 
   while (resto > 0 && s.fase !== "fin") {

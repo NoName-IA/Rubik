@@ -38,7 +38,7 @@ variante de Inter según el grosor.
 Los cambios en el código se ven en el celular al guardar.
 
 **Solo en desarrollo (Expo Go):** en el menú del Rubo, mantener presionado el ícono del control
-alterna entre borrar el progreso (modo IA bloqueado, con cadenas) y desbloquearlo (con las cadenas
+alterna entre borrar el progreso (modo IA bloqueado, con cadenas, y el arcade cerrado) y desbloquearlo (con las cadenas
 por romper). En el APK no hace nada.
 
 ## Compilar el APK
@@ -89,6 +89,7 @@ src/
 │   ├── ciudades.ts           # ciudades y sus municipios
 │   ├── pong.ts               # física del Rubo y cómo juega la máquina en cada nivel y fase
 │   ├── dialogo.ts            # frases de Rubo y el tiempo de cada letra
+│   ├── cueva.ts              # fondo de cueva de la cancha del arcade
 │   ├── avisos.ts dolar.ts preferencias.ts ubicacion.ts http.ts …
 │   └── accesos.ts            # ← para agregar un acceso rápido, se edita esta lista
 └── theme.ts                  # colores claro/oscuro, fuentes y medidas
@@ -114,6 +115,13 @@ bola y las barras son vistas que se mueven con `Animated.Value.setValue`, y la p
 vuelve a dibujar cuando cambia el marcador o la fase (saque, jugando, fin). Las animaciones de
 ambiente (glitches, cadenas, latidos, fondo rojo) usan el driver nativo y vistas simples, no SVG
 animado.
+
+- Las partículas del gol y las ondas del saque tienen su propia capa (`CapaEfectos`): solo esa se
+  redibuja en cada cuadro, no la pantalla entera.
+- La posición de la bola y de las barras (que cambia el juego) y sus animaciones nativas (golpe,
+  temblor) van en vistas separadas, para no mezclar los dos tipos de valores en una misma vista.
+- Si el celular se traba, el juego avanza como mucho 0,05 s por cuadro (`DT_MAXIMO`): va más lento
+  ese instante en vez de hacer saltar la bola.
 
 ## Comandos
 

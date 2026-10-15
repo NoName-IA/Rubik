@@ -13,7 +13,8 @@ export const VICTORIAS_PARA_IA = 2;
 // Clave nueva: las victorias de las versiones de prueba (con el modo IA siempre abierto) no cuentan,
 // así que se cuenta desde cero.
 export const CLAVE_VICTORIAS = "pong:victorias:v3";
-export type Victorias = Record<Nivel, number>;
+/** El arcade no se gana (es infinito): solo cuentan normal e IA. */
+export type Victorias = Record<Exclude<Nivel, "arcade">, number>;
 export const SIN_VICTORIAS: Victorias = { normal: 0, ia: 0 };
 
 export function leerVictorias(texto: string | null): Victorias {

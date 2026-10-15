@@ -4,6 +4,8 @@
 
 - golpe-jugador.wav / golpe-maquina.wav: la bola pega en tu barra (agudo) o en la de Rubo (grave).
 - glitch.wav: estática digital entrecortada, del largo de una ráfaga de la falla (DURACION_FALLA, 320 ms).
+- gol.wav / perdida.wav (solo modo normal): metes gol (cuatro notas que suben, alegre) o te lo meten
+  (notas que bajan y la última se arrastra, triste).
 
 La voz de Rubo (voz-N.wav) la genera scripts/generar-voces.ts, con los tiempos del texto.
 """
@@ -67,7 +69,23 @@ def glitch() -> list[float]:
     return muestras
 
 
+def melodia(notas: list[tuple[float, float]], deslizar_ultima: float = 0) -> list[float]:
+    """Notas cuadradas (frecuencia, segundos); la última puede bajar de tono al final (`deslizar_ultima`)."""
+    muestras: list[float] = []
+    for k, (f, seg) in enumerate(notas):
+        n = int(seg * FS)
+        fase = 0.0
+        ultima = k == len(notas) - 1
+        for i in range(n):
+            fase += f * (1 - (deslizar_ultima * i / n if ultima else 0)) / FS
+            env = min(1, i / 30) * (1 - i / n) ** (0.5 if ultima else 1.2)
+            muestras.append((1 if fase % 1 < 0.5 else -1) * env * 0.5)
+    return muestras
+
+
 if __name__ == "__main__":
     guardar("golpe-jugador.wav", golpe(523))
     guardar("golpe-maquina.wav", golpe(330))
     guardar("glitch.wav", glitch())
+    guardar("gol.wav", melodia([(523, 0.07), (659, 0.07), (784, 0.07), (1047, 0.22)]))
+    guardar("perdida.wav", melodia([(392, 0.12), (370, 0.12), (349, 0.12), (330, 0.45)], deslizar_ultima=0.35))
