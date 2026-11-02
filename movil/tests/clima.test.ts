@@ -108,7 +108,10 @@ test("formato de horas al estilo colombiano", () => {
 
 test("categorías de UV de la OMS", () => {
   assert.equal(categoriaUv(0), "bajo");
-  assert.equal(categoriaUv(2.9), "bajo");
+  assert.equal(categoriaUv(2.4), "bajo");
+  // Se muestra "3", así que debe decir "moderado" y no "bajo".
+  assert.equal(categoriaUv(2.7), "moderado");
+  assert.equal(categoriaUv(10.6), "extremo");
   assert.equal(categoriaUv(3), "moderado");
   assert.equal(categoriaUv(7), "alto");
   assert.equal(categoriaUv(9), "muy alto");

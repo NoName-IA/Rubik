@@ -32,8 +32,12 @@ export function formatoHoraMinutos(hora: HoraLocal): string {
   return `${h12}:${m} ${sufijo}`;
 }
 
-/** Categoría del índice UV según la OMS. */
-export function categoriaUv(uv: number): string {
+/**
+ * Categoría del índice UV según la OMS. La escala es de números enteros, así que se redondea
+ * igual que el valor que se muestra: si la app dice "3", la categoría es la del 3.
+ */
+export function categoriaUv(valor: number): string {
+  const uv = Math.round(valor);
   if (uv < 3) return "bajo";
   if (uv < 6) return "moderado";
   if (uv < 8) return "alto";
