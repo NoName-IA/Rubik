@@ -41,7 +41,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/**/*.test.ts\"",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "private": true,
   "license": "GPL-3.0-or-later"
