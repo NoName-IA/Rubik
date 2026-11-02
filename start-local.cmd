@@ -4,7 +4,7 @@ rem Ejecuta start-local.sh con Git Bash. Si la Wi-Fi no deja conectar: start-loc
 rem Para detener: Ctrl+C en esta ventana, o cerrarla.
 
 setlocal
-title Colombia en datos
+title Rubik
 cd /d "%~dp0"
 
 set "BASH="
