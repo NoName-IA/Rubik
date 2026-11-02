@@ -32,7 +32,7 @@ variante de Inter según el grosor.
    - **Windows:** doble clic en `start-local.cmd`.
    - **Git Bash, Linux o macOS:** `./start-local.sh`
 
-   (Equivale a `cd movil && npm install && npx expo start`.)
+   (Equivale a `cd movil && npm ci && npx expo start`. Requisito: Node 22.12+.)
 3. Abre Expo Go y escanea el código QR que aparece en la terminal. El celular y el computador
    deben estar en la **misma red Wi-Fi**. Si la red no lo permite (redes públicas o de
    empresa), usa `./start-local.sh --tunnel`.
