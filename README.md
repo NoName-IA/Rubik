@@ -152,6 +152,7 @@ Desde `movil/`:
 | `npm test` | Pruebas unitarias |
 | `npm run typecheck` | Revisión de tipos |
 | `npm run lint` | Lint |
+| `npm run check` | Las tres anteriores seguidas |
 
 Estilo visual, estructura de carpetas, cómo compilar el APK y más comandos en
 [`movil/README.md`](movil/README.md).
