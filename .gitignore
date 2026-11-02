@@ -5,3 +5,7 @@ __pycache__/
 # APK compilados (se descargan de EAS)
 *.apk
 *.aab
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
