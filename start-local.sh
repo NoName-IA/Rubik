@@ -48,7 +48,7 @@ puerto_ocupado "$APP_PORT" &&
 cd "$RAIZ/movil"
 LIMPIAR=0
 if [[ ! -d node_modules || package-lock.json -nt node_modules ]]; then
-  paso "Instalando dependencias de la app (solo la primera vez, ~1 minuto)"
+  paso "Instalando dependencias de la app (solo la primera vez, ~2 minutos)"
   npm ci --no-fund --no-audit --loglevel=error
   touch node_modules
   # Con dependencias nuevas, la caché de Metro puede apuntar a archivos que ya no existen.
